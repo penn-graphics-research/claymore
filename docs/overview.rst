@@ -48,10 +48,6 @@ Bibtex
 
 Please cite our paper if you use this code for your research: 
 
-.. bibliography:: paper.bib
-   :list: bullet
-   :all:
-
 .. code-block:: none
 
     @article{Wang2020multiGMPM, 
