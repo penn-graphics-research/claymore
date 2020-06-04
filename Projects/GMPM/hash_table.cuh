@@ -24,14 +24,14 @@ template <> struct HaloPartition<1> {
   }
   void copy_to(HaloPartition &other, std::size_t blockCnt,
                cudaStream_t stream) {
-    h_count = other.h_count;
-    checkCudaErrors(cudaMemcpyAsync(_haloMarks, other._haloMarks,
+    other.h_count = h_count;
+    checkCudaErrors(cudaMemcpyAsync(other._haloMarks, _haloMarks,
                                     sizeof(char) * blockCnt, cudaMemcpyDefault,
                                     stream));
-    checkCudaErrors(cudaMemcpyAsync(_overlapMarks, other._overlapMarks,
+    checkCudaErrors(cudaMemcpyAsync(other._overlapMarks, _overlapMarks,
                                     sizeof(int) * blockCnt, cudaMemcpyDefault,
                                     stream));
-    checkCudaErrors(cudaMemcpyAsync(_haloBlocks, other._haloBlocks,
+    checkCudaErrors(cudaMemcpyAsync(other._haloBlocks, _haloBlocks,
                                     sizeof(ivec3) * blockCnt, cudaMemcpyDefault,
                                     stream));
   }
