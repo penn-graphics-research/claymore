@@ -1,0 +1,20 @@
+# borrowed from taichi
+file(GLOB children RELATIVE ${CMAKE_CURRENT_LIST_DIR} *)
+
+foreach(dir ${children})
+    if(IS_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/${dir}")
+        if (${dir} MATCHES "^_")
+            message("Ignoring project ${dir}. (Starts with '_'.)")
+        else()
+            if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/${dir}/CMakeLists.txt")
+                message("Adding project ${dir}:")
+                add_subdirectory(${dir})
+            else()
+                message("Ignoring project ${dir}. (No CMakeLists.txt.)")
+            endif()
+        endif()
+    endif()
+    message("---------------------------------------------------------------")
+endforeach()
+
+set(MN_PROJECT_LIBRARIES ${MN_PROJECT_LIBRARIES} PARENT_SCOPE)

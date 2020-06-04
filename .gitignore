@@ -1,0 +1,10 @@
+.vscode
+build
+Projects/**/*.so
+Projects/CudaTest/cudatest
+Projects/Cpp20Test/cpptest
+Projects/StructuralTest/structuraltest
+**/*.exe.manifest
+**/*.exe
+**/*.bgeo
+Projects/MGSP/mgsp
