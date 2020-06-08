@@ -42,16 +42,16 @@ Harnessing the power of modern multi-GPU architectures, we present a massively p
 -->
 
 ## Compilation
-This is a cross-platform C++/CUDA cmake project. The minimum version requirement of cmake is 3.15, yet the latest version is generally recommended. The required CUDA version is 10.2.
+This is a cross-platform C++/CUDA cmake project. The minimum version requirement of cmake is 3.15, yet the latest version is generally recommended. The required CUDA version is 10.2 or 11.
 
 Currently, *supported OS* includes Windows 10 and Ubuntu (>=18.04), and *tested compilers* includes gcc8.4, msvc v142, clang-9 (includes msvc version). 
 
 ### Build
-Run the following command in the *root directory*.
+Run the following command in the *root directory*. Note that adding "--config Release" to the last command is needed when compiling using msvc.
 ```mkdir build
 cd build
 cmake ..
-cmake --build . --config Release
+cmake --build .
 ```
 
 Or configure the project using the *CMake Tools* extension in *Visual Studio Code* (recommended).
@@ -63,8 +63,8 @@ Currently, binary position data and the level-set (signed distance field) data a
 
 ### Run Demos
 The project provides the following GPU-based schemes for MPM:
-- improved single-GPU pipeline
-- static geometry (particle) partitioning multi-GPU pipeline
+- **GMPM**: improved single-GPU pipeline
+- **MGSP**: static geometry (particle) partitioning multi-GPU pipeline
 <!--
 - dynamic spatial partitioning multi-GPU pipeline
 -->
@@ -99,12 +99,12 @@ Please cite our paper if you use this code for your research:
 This project draws inspirations from [Taichi](https://github.com/taichi-dev/taichi), [GMPM](https://github.com/kuiwuchn/GPUMPM).
 
 ### Acknowledgement
-We thank Yuanming Hu for useful discussions and proofreading, Feng Gao for his help on configuring workstations. We appreciate Prof. Chenfanfu Jiang and Yuanming Hu for their insightful advice on the documentation.
+We thank [Yuanming Hu](http://taichi.graphics/me/) for useful discussions and proofreading, [Feng Gao](https://fen9.github.io/) for his help on configuring workstations. We appreciate Prof. [Chenfanfu Jiang](https://www.seas.upenn.edu/~cffjiang/) and [Yuanming Hu](http://taichi.graphics/me/) for their insightful advice on the documentation.
 
 ### Dependencies
 The following libraries are adopted in our project development:
 
-- [cub](http://nvlabs.github.io/cub/)
+- [cub](http://nvlabs.github.io/cub/) (now replaced by Thrust)
 - [fmt](https://fmt.dev/latest/index.html)
 
 For particle data IO and generation, we use these two libraries in addition:
