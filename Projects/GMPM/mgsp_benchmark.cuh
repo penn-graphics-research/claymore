@@ -216,6 +216,7 @@ struct mgsp_benchmark {
         for (int did = 0; did < g_device_cnt; ++did)
           if (maxVels[did] > maxVel)
             maxVel = maxVels[did];
+        maxVel = std::sqrt(maxVel);
         nextDt = compute_dt(maxVel, curTime, nextTime, dtDefault);
         fmt::print(fmt::emphasis::bold,
                    "{} --{}--> {}, defaultDt: {}, maxVel: {})\n", curTime,
