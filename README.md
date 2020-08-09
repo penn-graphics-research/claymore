@@ -59,7 +59,7 @@ Or configure the project using the *CMake Tools* extension in *Visual Studio Cod
 
 ### Data
 
-Currently, binary position data and the level-set (signed distance field) data are accepted as input files for particles. Uniformly sampling particles from analytic geometries is another viable way for the initialization of models.
+Currently, binary position data and the level-set (signed distance field) [data](https://github.com/littlemine/Data) are accepted as input files for particles. Uniformly sampling particles from analytic geometries is another viable way for the initialization of models.
 
 ### Run Demos
 The project provides the following GPU-based schemes for MPM:
