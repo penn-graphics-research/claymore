@@ -116,8 +116,20 @@ struct structural_traits {
     else
       _handle.ptr = nullptr;
   }
+  template <typename Allocator>
+  void allocate_handle(Allocator allocator, std::size_t s) {
+    if (s != 0)
+      _handle.ptr = allocator.allocate(s);
+    else
+      _handle.ptr = nullptr;
+  }
   template <typename Allocator> void deallocate(Allocator allocator) {
     allocator.deallocate(_handle.ptr, self::size);
+    _handle.ptr = nullptr;
+  }
+  template <typename Allocator>
+  void deallocate(Allocator allocator, std::size_t s) {
+    allocator.deallocate(_handle.ptr, s);
     _handle.ptr = nullptr;
   }
   // value access
@@ -299,7 +311,8 @@ struct structural<structural_type::dynamic, Decoration, Domain, Layout,
   void allocate_handle(Allocator allocator,
                        std::size_t capacity = Domain::extent) {
     if (capacity != 0)
-      this->_handle.ptr = allocator.allocate(capacity * base_t::element_storage_size);
+      this->_handle.ptr =
+          allocator.allocate(capacity * base_t::element_storage_size);
     else
       this->_handle.ptr = nullptr;
     _capacity = capacity;

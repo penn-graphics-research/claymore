@@ -211,7 +211,7 @@ struct mgsp_benchmark {
     /// initial
     float nextTime = 1.f / fps;
     dt = compute_dt(0.f, curTime, nextTime, dtDefault);
-    fmt::print(fmt::emphasis::bold, "{} --{}--> {}, defaultDt: {})\n", curTime,
+    fmt::print(fmt::emphasis::bold, "{} --{}--> {}, defaultDt: {}\n", curTime,
                dt, nextTime, dtDefault);
     initial_setup();
     curTime = dt;
@@ -260,7 +260,7 @@ struct mgsp_benchmark {
         maxVel = std::sqrt(maxVel);
         nextDt = compute_dt(maxVel, curTime, nextTime, dtDefault);
         fmt::print(fmt::emphasis::bold,
-                   "{} --{}--> {}, defaultDt: {}, maxVel: {})\n", curTime,
+                   "{} --{}--> {}, defaultDt: {}, maxVel: {}\n", curTime,
                    nextDt, nextTime, dtDefault, maxVel);
 
         /// g2p2g

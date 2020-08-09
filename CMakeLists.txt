@@ -13,6 +13,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/CMake)
 option(BUILD_SHARED_LIBS "Enable compilation of shared libraries" OFF)
 include(setup_cpp.cmake)
 include(setup_cuda.cmake)
+include(setup_externallibs.cmake)
 add_subdirectory(Externals)
 # header only libraries
 include_directories(Externals/variant Externals/optional Externals/function_ref)

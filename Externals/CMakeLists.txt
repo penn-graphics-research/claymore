@@ -7,17 +7,6 @@ include(DownloadProject)
 message("## building partio")
 add_subdirectory(partio)
 
-# fmt
-message("## building fmt")
-#add_subdirectory(fmt-6.1.2)
-#target_include_directories(fmt SYSTEM INTERFACE fmt-6.1.2/include)
-FetchContent_Declare(
-    fmt
-    GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-    GIT_TAG 19bd751020a1f3c3363b2eb67a039852f139a8d3
-)
-FetchContent_MakeAvailable(fmt)
-
 # optional
 #FetchContent_Declare(
 #    optional

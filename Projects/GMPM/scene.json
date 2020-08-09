@@ -1,0 +1,89 @@
+{
+	"simulation": {
+		"gpuid": 1,
+		"gravity": -9.8,
+		"fps": 120,
+		"frames": 120,
+		"default_dt": 5e-6
+	},
+	"models": [
+		{
+			"type": "particle",
+			"file": "board.sdf",
+			"constitutive": "nacc",
+			"ppc": 8,
+			"volume": 7.4505806e-9,
+			"rho": 2240,
+			"youngs_modulus": 1e9,
+			"poisson_ratio": 0.2,
+			"beta": 1.0,
+			"xi": 0.8,
+			"offset": [
+				0.5,
+				0.5,
+				0.3
+			],
+			"span": [
+				0.1,
+				0.1,
+				0.1
+			],
+			"velocity": [
+				0,
+				0,
+				0
+			]
+		},
+		{
+			"type": "particle",
+			"file": "yoda.sdf",
+			"constitutive": "fixed_corotated",
+			"ppc": 8,
+			"volume": 7.4505806e-9,
+			"rho": 1e3,
+			"youngs_modulus": 1e7,
+			"poisson_ratio": 0.4,
+			"offset": [
+				0.3,
+				0.2,
+				0.3
+			],
+			"span": [
+				0.05,
+				0.05,
+				0.05
+			],
+			"velocity": [
+				-1.0,
+				0,
+				0
+			]
+		},
+		{
+			"type": "particle",
+			"file": "arma.sdf",
+			"constitutive": "jfluid",
+			"ppc": 8,
+			"volume": 7.4505806e-9,
+			"rho": 1e3,
+			"bulk_modulus": 4e4,
+			"gamma": 7.15,
+			"viscosity": 0.01,
+			"offset": [
+				0.3,
+				0.2,
+				0.5
+			],
+			"span": [
+				0.1,
+				0.1,
+				0.1
+			],
+			"velocity": [
+				0.0,
+				0,
+				0
+			]
+		}
+	]
+}

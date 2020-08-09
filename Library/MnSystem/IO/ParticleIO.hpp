@@ -28,6 +28,7 @@ void write_partio(std::string filename,
   parts->release();
 }
 
+/// have issues
 auto read_sdf(std::string fn, float ppc, float dx, vec<float, 3> offset,
               vec<float, 3> lengths) {
   std::vector<std::array<float, 3>> data;
@@ -55,6 +56,42 @@ auto read_sdf(std::string fn, float ppc, float dx, vec<float, 3> offset,
     // particle[0] = ((samples[i * 3 + 0]) + offset[0]);
     // particle[1] = ((samples[i * 3 + 1]) + offset[1]);
     // particle[2] = ((samples[i * 3 + 2]) + offset[2]);
+    data.push_back(std::array<float, 3>{p[0], p[1], p[2]});
+  }
+  printf("[%f, %f, %f] - [%f, %f, %f], scale %f, parcnt %d, lsdx %f, dx %f\n",
+         mins[0], mins[1], mins[2], maxs[0], maxs[1], maxs[2], scale,
+         (int)data.size(), levelsetDx, dx);
+  return data;
+}
+
+auto read_sdf(std::string fn, float ppc, float dx, int domainsize,
+              vec<float, 3> offset, vec<float, 3> lengths) {
+  std::vector<std::array<float, 3>> data;
+  std::string fileName = std::string(AssetDirPath) + "MpmParticles/" + fn;
+
+  float levelsetDx;
+  SampleGenerator pd;
+  std::vector<float> samples;
+  vec<float, 3> mins, maxs, scales;
+  vec<int, 3> maxns;
+  pd.LoadSDF(fileName, levelsetDx, mins[0], mins[1], mins[2], maxns[0],
+             maxns[1], maxns[2]);
+  maxs = maxns.cast<float>() * levelsetDx;
+
+  scales = maxns.cast<float>() / domainsize;
+  float scale = scales[0] < scales[1] ? scales[0] : scales[1];
+  scale = scales[2] < scale ? scales[2] : scale;
+  float samplePerLevelsetCell = ppc * scale;
+
+  pd.GenerateUniformSamples(samplePerLevelsetCell, samples);
+
+  scales = lengths / (maxs - mins) / maxns.cast<float>();
+  scale = scales[0] < scales[1] ? scales[0] : scales[1];
+  scale = scales[2] < scale ? scales[2] : scale;
+
+  for (int i = 0, size = samples.size() / 3; i < size; i++) {
+    vec<float, 3> p{samples[i * 3 + 0], samples[i * 3 + 1], samples[i * 3 + 2]};
+    p = (p - mins) * scale + offset;
     data.push_back(std::array<float, 3>{p[0], p[1], p[2]});
   }
   printf("[%f, %f, %f] - [%f, %f, %f], scale %f, parcnt %d, lsdx %f, dx %f\n",

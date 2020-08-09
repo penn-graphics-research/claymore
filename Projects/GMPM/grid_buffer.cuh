@@ -6,12 +6,6 @@
 
 namespace mn {
 
-using BlockDomain = compact_domain<char, config::g_blocksize,
-                                   config::g_blocksize, config::g_blocksize>;
-using GridDomain = compact_domain<int, config::g_grid_size, config::g_grid_size,
-                                  config::g_grid_size>;
-using GridBufferDomain = compact_domain<int, config::g_max_active_block>;
-
 using grid_block_ =
     structural<structural_type::dense,
                decorator<structural_allocation_policy::full_allocation,

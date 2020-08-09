@@ -124,6 +124,12 @@ constexpr auto spawn(Allocator allocator) {
   return ret;
 }
 template <typename Structural, typename Componenets, typename Allocator>
+constexpr auto spawn(Allocator allocator, std::size_t size) {
+  auto ret = Instance<Structural, Componenets>{};
+  ret.allocate_handle(allocator, size);
+  return ret;
+}
+template <typename Structural, typename Componenets, typename Allocator>
 constexpr void recycle(Instance<Structural, Componenets> &instance,
                        Allocator allocator) {
   instance.deallocate(allocator);

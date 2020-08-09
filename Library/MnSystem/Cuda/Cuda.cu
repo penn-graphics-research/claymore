@@ -85,10 +85,6 @@ Cuda::Cuda() : _default_devId{0} {
     ///< memory allocator
     std::size_t free_byte, total_byte;
     checkCudaErrors(cudaMemGetInfo(&free_byte, &total_byte));
-    /// CRITICAL: not sure what goes wrong with virtual allocator
-    _akMonotonicVirtualAllocators.emplace_back(
-        std::make_unique<MonotonicVirtualAllocator>(i, prop.textureAlignment,
-                                                    1));
     ///
     _akMonotonicAllocators.emplace_back(std::make_unique<MonotonicAllocator>(
         prop.textureAlignment,
@@ -137,10 +133,6 @@ Cuda::~Cuda() {
   for (auto &monoAllocator : _akMonotonicAllocators)
     for (int i = 0; i < getInstance()->_akMonotonicAllocators.size(); ++i)
       getInstance()->_akMonotonicAllocators[i].~MonotonicAllocator();
-  for (int i = 0; i < getInstance()->_akMonotonicVirtualAllocators.size(); ++i)
-    getInstance()
-        ->_akMonotonicVirtualAllocators[i]
-        .~MonotonicVirtualAllocator();
 #endif
   printf("  Finished \'Cuda\' termination\n");
 }

@@ -21,7 +21,7 @@ enum class material_e { JFluid = 0, FixedCorotated, Sand, NACC, Total };
 namespace config {
 constexpr int g_device_cnt = 2;
 constexpr material_e get_material_type(int did) noexcept {
-  material_e type{material_e::JFluid};
+  material_e type{material_e::FixedCorotated};
   return type;
 }
 constexpr int g_total_frame_cnt = 60;
@@ -65,18 +65,25 @@ constexpr int g_particle_num_per_block = (MAX_PPC * (1 << (BLOCK_BITS * 3)));
 #define POISSON_RATIO 0.4f
 
 //
-constexpr float g_gravity = -9.8f * 0.5;
+constexpr float g_gravity = -9.8f;
 
 /// only used on host
-constexpr int g_max_particle_num = 2000000;
-constexpr int g_max_active_block = 12000; /// 62500 bytes for active mask
+constexpr int g_max_particle_num = 1000000;
+constexpr int g_max_active_block = 10000; /// 62500 bytes for active mask
 constexpr std::size_t
 calc_particle_bin_count(std::size_t numActiveBlocks) noexcept {
   return numActiveBlocks * (g_max_ppc * g_blockvolume / g_bin_capacity);
 }
 constexpr std::size_t g_max_particle_bin = g_max_particle_num / g_bin_capacity;
+constexpr std::size_t g_max_halo_block = 4000;
 
 } // namespace config
+
+using BlockDomain = compact_domain<char, config::g_blocksize,
+                                   config::g_blocksize, config::g_blocksize>;
+using GridDomain = compact_domain<int, config::g_grid_size, config::g_grid_size,
+                                  config::g_grid_size>;
+using GridBufferDomain = compact_domain<int, config::g_max_active_block>;
 
 } // namespace mn
 

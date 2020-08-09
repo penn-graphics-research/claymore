@@ -230,20 +230,10 @@ public:
     }
     void resetMem() { monotonicAllocator().reset(); }
 
-    ///< 4. pre-allocated virtual memory
-    auto borrowVirtual(std::size_t bytes) -> void * {
-      return monotonicVirtualAllocator().borrow(bytes);
-    }
-    void resetVirtualMem() { monotonicVirtualAllocator().reset(); }
-
   private:
     auto monotonicAllocator() -> MonotonicAllocator & {
       // setContext();
       return *Cuda::getInstance()->_akMonotonicAllocators[_devId];
-    }
-    auto monotonicVirtualAllocator() -> MonotonicVirtualAllocator & {
-      // setContext();
-      return *Cuda::getInstance()->_akMonotonicVirtualAllocators[_devId];
     }
 
     ///< 4. cuda memset
@@ -305,8 +295,6 @@ private:
   std::vector<vec<cudaEvent_t, (int)EventIndex::Total>> _akEvents;
   std::vector<std::unique_ptr<MonotonicAllocator>>
       _akMonotonicAllocators; ///< an allocator is a handle to a heap
-  std::vector<std::unique_ptr<MonotonicVirtualAllocator>>
-      _akMonotonicVirtualAllocators;
 
   std::unordered_map<std::string, KernelConfig> _kFuncTable;
 

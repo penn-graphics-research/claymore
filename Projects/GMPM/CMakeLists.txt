@@ -6,7 +6,12 @@ target_sources(gmpm
 )
 target_link_libraries(gmpm
     PRIVATE     mnio
+                cxxopts
+                spdlog
                 fmt
+                rapidjson
+                range-v3
+                filesystem
 )
 
 endif()
