@@ -30,7 +30,7 @@ function(add_cuda_executable binary)
     target_compile_options(${binary} 
       PRIVATE     $<$<COMPILE_LANGUAGE:CUDA>:${CMAKE_CUDA_FLAGS} ${TARGET_CUDA_ARCH} --expt-extended-lambda --expt-relaxed-constexpr --default-stream=per-thread --use_fast_math -lineinfo --ptxas-options=-allow-expensive-optimizations=true>
     )
-    target_compile_features(${binary} PRIVATE cxx_std_14)
+    target_compile_features(${binary} PRIVATE cuda_std_14)
     set_target_properties(${binary}
       PROPERTIES  CUDA_EXTENSIONS ON
                   CUDA_SEPARABLE_COMPILATION ON
@@ -54,7 +54,7 @@ function(add_cuda_library library)
     #target_link_options(${library} 
     #  PRIVATE       $<$<LINKER_LANGUAGE:CUDA>:-arch=sm_75>
     #)
-    target_compile_features(${library} PRIVATE cxx_std_14)
+    target_compile_features(${library} PRIVATE cuda_std_14)
     set_target_properties(${library}
       PROPERTIES  CUDA_EXTENSIONS ON
                   CUDA_SEPARABLE_COMPILATION ON
