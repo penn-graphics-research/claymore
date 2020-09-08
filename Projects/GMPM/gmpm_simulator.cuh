@@ -493,7 +493,7 @@ struct GmpmSimulator {
                                compute_bin_capacity, pbcnt + 1,
                                (const int *)pb._ppbs, binpbs);
           exclScan(pbcnt + 1, binpbs, pb._binsts, cuDev);
-          checkCudaErrors(cudaMemcpyAsync(&bincnt[0], pb._binsts + pbcnt,
+          checkCudaErrors(cudaMemcpyAsync(&bincnt[i], pb._binsts + pbcnt,
                                           sizeof(int), cudaMemcpyDefault,
                                           cuDev.stream_compute()));
           cuDev.syncStream<streamIdx::Compute>();
