@@ -131,7 +131,8 @@ struct GmpmSimulator {
   void exclScan(std::size_t cnt, int const *const in, int *out,
                 CudaContext &cuDev) {
 #if 1
-    thrust::exclusive_scan(getDevicePtr(in), getDevicePtr(in) + cnt,
+    auto policy = thrust::cuda::par.on((cudaStream_t)cuDev.stream_compute());
+    thrust::exclusive_scan(policy, getDevicePtr(in), getDevicePtr(in) + cnt,
                            getDevicePtr(out));
 #else
     std::size_t temp_storage_bytes = 0;
