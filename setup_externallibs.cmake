@@ -69,7 +69,7 @@ CPMAddPackage(
 CPMAddPackage(
   NAME filesystem 
   GITHUB_REPOSITORY gulrak/filesystem
-  VERSION 1.3.2
+  VERSION 1.3.4
 )
 if(filesystem_ADDED) 
   add_library(filesystem INTERFACE IMPORTED)

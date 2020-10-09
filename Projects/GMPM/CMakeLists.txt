@@ -12,6 +12,7 @@ target_link_libraries(gmpm
                 rapidjson
                 range-v3
                 filesystem
+                stdc++fs
 )
 
 endif()

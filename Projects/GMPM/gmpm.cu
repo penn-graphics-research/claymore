@@ -10,8 +10,13 @@
 #include <fmt/core.h>
 #include <fstream>
 
+#if 0
 #include <ghc/filesystem.hpp>
 namespace fs = ghc::filesystem;
+#else
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
+#endif
 
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
