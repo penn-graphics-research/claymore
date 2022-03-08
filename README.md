@@ -10,7 +10,7 @@ This is the opensource code for the SIGGRAPH 2020 paper:
 
 **A Massively Parallel and Scalable Multi-GPU Material Point Method** 
 
-[page](https://sites.google.com/view/siggraph2020-multigpu)\, [pdf](https://www.seas.upenn.edu/~cffjiang/research/wang2020multigpu/wang2020multigpu.pdf)\, [supp](https://www.seas.upenn.edu/~cffjiang/research/wang2020multigpu/supp.pdf)\, [video](https://vimeo.com/414136257)
+[page](https://sites.google.com/view/siggraph2020-multigpu)\, [pdf](https://math.ucla.edu/~cffjiang/research/wang2020multigpu/wang2020multigpu.pdf)\, [supp](https://math.ucla.edu/~cffjiang/research/wang2020multigpu/supp.pdf)\, [video](https://vimeo.com/414136257)
 
 Authors:
 [Xinlei Wang](https://github.com/littlemine)\*, 
@@ -22,7 +22,7 @@ Authors:
 [Yixin Zhu](https://yzhu.io/), 
 [Min Tang](https://min-tang.github.io/home/), 
 [Dinesh Manocha](https://www.cs.umd.edu/people/dmanocha)
-[Chenfanfu Jiang](https://www.seas.upenn.edu/~cffjiang/)
+[Chenfanfu Jiang](https://math.ucla.edu/~cffjiang/)
 (* Equal contributions)
 
 <p float="left">
@@ -99,7 +99,7 @@ Please cite our paper if you use this code for your research:
 This project draws inspirations from [Taichi](https://github.com/taichi-dev/taichi), [GMPM](https://github.com/kuiwuchn/GPUMPM).
 
 ### Acknowledgement
-We thank [Yuanming Hu](http://taichi.graphics/me/) for useful discussions and proofreading, [Feng Gao](https://fen9.github.io/) for his help on configuring workstations. We appreciate Prof. [Chenfanfu Jiang](https://www.seas.upenn.edu/~cffjiang/) and [Yuanming Hu](http://taichi.graphics/me/) for their insightful advice on the documentation.
+We thank [Yuanming Hu](http://taichi.graphics/me/) for useful discussions and proofreading, [Feng Gao](https://fen9.github.io/) for his help on configuring workstations. We appreciate Prof. [Chenfanfu Jiang](https://math.ucla.edu/~cffjiang/) and [Yuanming Hu](http://taichi.graphics/me/) for their insightful advice on the documentation.
 
 ### Dependencies
 The following libraries are adopted in our project development:
