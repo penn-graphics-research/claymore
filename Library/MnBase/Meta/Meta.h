@@ -35,8 +35,7 @@ template <bool B> struct enable_if;
 template <> struct enable_if<true> { using type = char; };
 template <bool B> using enable_if_t = typename enable_if<B>::type;
 template <bool... Bs>
-using enable_if_all = typename enable_if<logic_and(
-    {std::integral_constant<bool, Bs>()...})>::type;
+using enable_if_all = typename enable_if<std::conjunction<std::integral_constant<bool,Bs>...>::value>::type;
 template <bool... Bs>
 using enable_if_any = typename enable_if<logic_or(
     {std::integral_constant<bool, Bs>()...})>::type;

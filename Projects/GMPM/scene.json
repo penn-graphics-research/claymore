@@ -1,6 +1,6 @@
 {
 	"simulation": {
-		"gpuid": 1,
+		"gpuid": 0,
 		"gravity": -9.8,
 		"fps": 120,
 		"frames": 120,
@@ -9,7 +9,7 @@
 	"models": [
 		{
 			"type": "particle",
-			"file": "board.sdf",
+			"file": "two_dragons.sdf",
 			"constitutive": "nacc",
 			"ppc": 8,
 			"volume": 7.4505806e-9,
@@ -36,7 +36,7 @@
 		},
 		{
 			"type": "particle",
-			"file": "yoda.sdf",
+			"file": "two_dragons.sdf",
 			"constitutive": "fixed_corotated",
 			"ppc": 8,
 			"volume": 7.4505806e-9,
@@ -61,7 +61,7 @@
 		},
 		{
 			"type": "particle",
-			"file": "arma.sdf",
+			"file": "two_dragons.sdf",
 			"constitutive": "jfluid",
 			"ppc": 8,
 			"volume": 7.4505806e-9,

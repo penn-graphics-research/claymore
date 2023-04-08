@@ -28,18 +28,21 @@ function(add_cuda_executable binary)
     add_executable(${binary} ${ARGN})
     # seems not working
     target_compile_options(${binary} 
-      PRIVATE     $<$<COMPILE_LANGUAGE:CUDA>:${CMAKE_CUDA_FLAGS} ${TARGET_CUDA_ARCH} --expt-extended-lambda --expt-relaxed-constexpr --default-stream=per-thread --use_fast_math -lineinfo --ptxas-options=-allow-expensive-optimizations=true>
+      PRIVATE     $<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CUDA>>:-G;-g> $<$<COMPILE_LANGUAGE:CUDA>:${CMAKE_CUDA_FLAGS} ${TARGET_CUDA_ARCH} --expt-extended-lambda --expt-relaxed-constexpr --default-stream=per-thread --use_fast_math -lineinfo --ptxas-options=-allow-expensive-optimizations=true>
     )
-    target_compile_features(${binary} PRIVATE cuda_std_14)
+    target_compile_features(${binary} PRIVATE cuda_std_17)
     set_target_properties(${binary}
       PROPERTIES  CUDA_EXTENSIONS ON
                   CUDA_SEPARABLE_COMPILATION ON
                   #LINKER_LANGUAGE CUDA
-                  RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                  RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
     target_link_libraries(${binary}
         PRIVATE mncuda
     )
+	install(TARGETS
+		${binary}
+	)
     message("-- [${binary}]\tcuda executable build config")
   endif()
 endfunction(add_cuda_executable)
@@ -49,12 +52,12 @@ function(add_cuda_library library)
     add_library(${library} ${ARGN})
     # seems not working
     target_compile_options(${library} 
-      PUBLIC        $<$<COMPILE_LANGUAGE:CUDA>:${CMAKE_CUDA_FLAGS} ${TARGET_CUDA_ARCH} --expt-extended-lambda --expt-relaxed-constexpr --default-stream=per-thread --use_fast_math -lineinfo --ptxas-options=-allow-expensive-optimizations=true>
+      PUBLIC        $<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CUDA>>:-G;-g>  $<$<COMPILE_LANGUAGE:CUDA>:${CMAKE_CUDA_FLAGS} ${TARGET_CUDA_ARCH} --expt-extended-lambda --expt-relaxed-constexpr --default-stream=per-thread --use_fast_math -lineinfo --ptxas-options=-allow-expensive-optimizations=true>
     )
     #target_link_options(${library} 
     #  PRIVATE       $<$<LINKER_LANGUAGE:CUDA>:-arch=sm_75>
     #)
-    target_compile_features(${library} PRIVATE cuda_std_14)
+    target_compile_features(${library} PRIVATE cuda_std_17)
     set_target_properties(${library}
       PROPERTIES  CUDA_EXTENSIONS ON
                   CUDA_SEPARABLE_COMPILATION ON

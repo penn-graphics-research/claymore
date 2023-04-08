@@ -14,8 +14,8 @@
 #include <ghc/filesystem.hpp>
 namespace fs = ghc::filesystem;
 #else
-#include <experimental/filesystem>
-namespace fs = std::experimental::filesystem;
+#include <filesystem>
+namespace fs = std::filesystem;
 #endif
 
 #include <rapidjson/document.h>
@@ -50,7 +50,10 @@ void parse_scene(std::string fn,
                  std::unique_ptr<mn::GmpmSimulator> &benchmark) {
 
   fs::path p{fn};
-  if (p.empty())
+  if(!p.is_absolute()){
+	  p = fs::relative(p);
+  }
+  if (!fs::exists(p))
     fmt::print("file not exist {}\n", fn);
   else {
     std::size_t size = fs::file_size(p);
@@ -80,7 +83,7 @@ void parse_scene(std::string fn,
           fmt::print(
               fg(fmt::color::cyan),
               "simulation: gpuid[{}], defaultDt[{}], fps[{}], frames[{}]\n",
-              sim["gpu"].GetInt(), sim["default_dt"].GetFloat(),
+              sim["gpuid"].GetInt(), sim["default_dt"].GetFloat(),
               sim["fps"].GetInt(), sim["frames"].GetInt());
           benchmark = std::make_unique<mn::GmpmSimulator>(
               sim["gpuid"].GetInt(), sim["default_dt"].GetFloat(),
@@ -136,7 +139,7 @@ void parse_scene(std::string fn,
                   model["file"].GetString(), model["ppc"].GetFloat(),
                   mn::config::g_dx, mn::config::g_domain_size, offset, span);
               mn::IO::insert_job([&]() {
-                mn::write_partio<float, 3>(std::string{p.stem()} + ".bgeo",
+                mn::write_partio<float, 3>(p.stem().string() + ".bgeo",
                                            positions);
               });
               mn::IO::flush();
@@ -169,7 +172,7 @@ int main(int argc, char *argv[]) {
 
     constexpr auto LEN = 46;
     constexpr auto STRIDE = 56;
-    constexpr auto MODEL_CNT = 1;
+    constexpr auto MODEL_CNT = 3;
     for (int did = 0; did < 2; ++did) {
       std::vector<std::array<float, 3>> model;
       for (int i = 0; i < MODEL_CNT; ++i) {

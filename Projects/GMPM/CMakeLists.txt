@@ -12,7 +12,13 @@ target_link_libraries(gmpm
                 rapidjson
                 range-v3
                 filesystem
-                stdc++fs
+)
+
+#Copy scene files
+#TODO: Move them into extra directory
+install(DIRECTORY
+	${CMAKE_CURRENT_LIST_DIR}/ DESTINATION ${CMAKE_INSTALL_BINDIR}
+	FILES_MATCHING PATTERN "*.json"
 )
 
 endif()
