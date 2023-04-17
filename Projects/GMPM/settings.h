@@ -1,90 +1,96 @@
-#ifndef __SETTINGS_H_
-#define __SETTINGS_H_
+#ifndef SETTINGS_H
+#define SETTINGS_H
 #include <MnBase/Math/Vec.h>
 #include <MnBase/Object/Structural.h>
+
 #include <array>
 
 namespace mn {
 
-using ivec3 = vec<int, 3>;
-using vec3 = vec<float, 3>;
-using vec9 = vec<float, 9>;
-using vec3x3 = vec<float, 3, 3>;
-using vec3x4 = vec<float, 3, 4>;
+using ivec3	   = vec<int, 3>;
+using vec3	   = vec<float, 3>;
+using vec9	   = vec<float, 9>;
+using vec3x3   = vec<float, 3, 3>;
+using vec3x4   = vec<float, 3, 4>;
 using vec3x3x3 = vec<float, 3, 3, 3>;
 
 /// sand = Drucker Prager Plasticity, StvkHencky Elasticity
-enum class material_e { JFluid = 0, FixedCorotated, Sand, NACC, Total };
+enum class MaterialE {
+	J_FLUID = 0,
+	FIXED_COROTATED,
+	SAND,
+	NACC,
+	TOTAL
+};
 
 /// https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html, F.3.16.5
 /// benchmark setup
 namespace config {
-constexpr int g_device_cnt = 1;
-constexpr material_e get_material_type(int did) noexcept {
-  material_e type{material_e::FixedCorotated};
-  return type;
-}
-constexpr int g_total_frame_cnt = 60;
+	constexpr int G_DEVICE_CNT = 1;
+	constexpr MaterialE get_material_type(int did) noexcept {
+		(void) did;
 
-#define GBPCB 16
-constexpr int g_num_grid_blocks_per_cuda_block = GBPCB;
-constexpr int g_num_warps_per_grid_block = 1;
-constexpr int g_num_warps_per_cuda_block = GBPCB;
-constexpr int g_particle_batch_capacity = 128;
+		return MaterialE::FIXED_COROTATED;
+	}
+	constexpr int G_TOTAL_FRAME_CNT = 60;
+	constexpr int NUM_DIMENSIONS	= 3;
 
-#define MODEL_PPC 8.f
-constexpr float g_model_ppc = MODEL_PPC;
-constexpr float cfl = 0.5f;
+	constexpr int GBPCB							   = 16;
+	constexpr int G_NUM_GRID_BLOCKS_PER_CUDA_BLOCK = GBPCB;
+	constexpr int G_NUM_WARPS_PER_GRID_BLOCK	   = 1;
+	constexpr int G_NUM_WARPS_PER_CUDA_BLOCK	   = GBPCB;
+	constexpr int G_PARTICLE_BATCH_CAPACITY		   = 128;
 
-// background_grid
-#define BLOCK_BITS 2
-#define DOMAIN_BITS 8
-#define DXINV (1.f * (1 << DOMAIN_BITS))
-constexpr int g_domain_bits = DOMAIN_BITS;
-constexpr int g_domain_size = (1 << DOMAIN_BITS);
-constexpr float g_bc = 2;
-constexpr float g_dx = 1.f / DXINV;
-constexpr float g_dx_inv = DXINV;
-constexpr float g_D_inv = 4.f * DXINV * DXINV;
-constexpr int g_blockbits = BLOCK_BITS;
-constexpr int g_blocksize = (1 << BLOCK_BITS);
-constexpr int g_blockmask = ((1 << BLOCK_BITS) - 1);
-constexpr int g_blockvolume = (1 << (BLOCK_BITS * 3));
-constexpr int g_grid_bits = (DOMAIN_BITS - BLOCK_BITS);
-constexpr int g_grid_size = (1 << (DOMAIN_BITS - BLOCK_BITS));
+	constexpr float MODEL_PPC	= 8.0f;
+	constexpr float G_MODEL_PPC = MODEL_PPC;
+	constexpr float CFL			= 0.5f;
 
-// particle
-#define MAX_PPC 128
-constexpr int g_max_ppc = MAX_PPC;
-constexpr int g_bin_capacity = 32;
-constexpr int g_particle_num_per_block = (MAX_PPC * (1 << (BLOCK_BITS * 3)));
+	// background_grid
+	constexpr int BLOCK_BITS	= 2;
+	constexpr int DOMAIN_BITS	= 8;
+	constexpr float DXINV		= (1.0f * (1u << DOMAIN_BITS));
+	constexpr int G_DOMAIN_BITS = DOMAIN_BITS;
+	constexpr int G_DOMAIN_SIZE = (1 << DOMAIN_BITS);
+	constexpr float G_BC		= 2.0;
+	constexpr float G_DX		= 1.f / DXINV;
+	constexpr float G_DX_INV	= DXINV;
+	constexpr float G_D_INV		= 4.f * DXINV * DXINV;
+	constexpr int G_BLOCKBITS	= BLOCK_BITS;
+	constexpr int G_BLOCKSIZE	= (1 << BLOCK_BITS);
+	constexpr int G_BLOCKMASK	= ((1 << BLOCK_BITS) - 1);
+	constexpr int G_BLOCKVOLUME = (1 << (BLOCK_BITS * 3));
+	constexpr int G_GRID_BITS	= (DOMAIN_BITS - BLOCK_BITS);
+	constexpr int G_GRID_SIZE	= (1 << (DOMAIN_BITS - BLOCK_BITS));
 
-// material parameters
-#define DENSITY 1e3
-#define YOUNGS_MODULUS 5e3
-#define POISSON_RATIO 0.4f
+	// particle
+	constexpr int MAX_PPC				   = 128;
+	constexpr int G_MAX_PPC				   = MAX_PPC;
+	constexpr int G_BIN_CAPACITY		   = 32;
+	constexpr int G_PARTICLE_NUM_PER_BLOCK = (MAX_PPC * (1 << (BLOCK_BITS * 3)));
 
-//
-constexpr float g_gravity = -9.8f;
+	// material parameters
+	constexpr float DENSITY		   = 1e3;
+	constexpr float YOUNGS_MODULUS = 5e3;
+	constexpr float POISSON_RATIO  = 0.4f;
 
-/// only used on host
-constexpr int g_max_particle_num = 1000000;
-constexpr int g_max_active_block = 10000; /// 62500 bytes for active mask
-constexpr std::size_t
-calc_particle_bin_count(std::size_t numActiveBlocks) noexcept {
-  return numActiveBlocks * (g_max_ppc * g_blockvolume / g_bin_capacity);
-}
-constexpr std::size_t g_max_particle_bin = g_max_particle_num / g_bin_capacity;
-constexpr std::size_t g_max_halo_block = 4000;
+	//
+	constexpr float G_GRAVITY = -9.8f;
 
-} // namespace config
+	/// only used on host
+	constexpr int G_MAX_PARTICLE_NUM = 1000000;
+	constexpr int G_MAX_ACTIVE_BLOCK = 10000;/// 62500 bytes for active mask
+	constexpr std::size_t calc_particle_bin_count(std::size_t num_active_blocks) noexcept {
+		return num_active_blocks * (G_MAX_PPC * G_BLOCKVOLUME / G_BIN_CAPACITY);
+	}
+	constexpr std::size_t G_MAX_PARTICLE_BIN = G_MAX_PARTICLE_NUM / G_BIN_CAPACITY;
+	constexpr std::size_t G_MAX_HALO_BLOCK	 = 4000;
 
-using BlockDomain = compact_domain<char, config::g_blocksize,
-                                   config::g_blocksize, config::g_blocksize>;
-using GridDomain = compact_domain<int, config::g_grid_size, config::g_grid_size,
-                                  config::g_grid_size>;
-using GridBufferDomain = compact_domain<int, config::g_max_active_block>;
+}// namespace config
 
-} // namespace mn
+using BlockDomain	   = CompactDomain<char, config::G_BLOCKSIZE, config::G_BLOCKSIZE, config::G_BLOCKSIZE>;
+using GridDomain	   = CompactDomain<int, config::G_GRID_SIZE, config::G_GRID_SIZE, config::G_GRID_SIZE>;
+using GridBufferDomain = CompactDomain<int, config::G_MAX_ACTIVE_BLOCK>;
+
+}// namespace mn
 
 #endif

@@ -9,4 +9,13 @@ target_link_libraries(mgsp
                 fmt
 )
 
+#Add headers as system headers
+get_target_property(HEADERS_FMT fmt INTERFACE_SYSTEM_INCLUDE_DIRECTORIES)
+
+target_include_directories(mgsp
+	SYSTEM
+	PRIVATE ${CMAKE_SOURCE_DIR}/Library
+	PRIVATE ${HEADERS_FMT}
+)
+
 endif()

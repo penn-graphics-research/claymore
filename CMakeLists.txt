@@ -9,6 +9,13 @@ project(Mn
     DESCRIPTION ${project_description}
     LANGUAGES   CXX CUDA)
 
+#Fixes https://gitlab.kitware.com/cmake/cmake/-/issues/24154 for older cmake versions
+set(CMAKE_INCLUDE_SYSTEM_FLAG_CUDA "-isystem ")
+
+#Temporarly suppresses error (till fixed)
+#https://github.com/google/googletest/pull/1792 causes issue in rapidjson relying on older version of gtest
+string(APPEND CMAKE_CXX_FLAGS " /wd5046")
+
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/CMake)
 option(BUILD_SHARED_LIBS "Enable compilation of shared libraries" OFF)
 include(setup_cpp.cmake)
@@ -16,7 +23,12 @@ include(setup_cuda.cmake)
 include(setup_externallibs.cmake)
 add_subdirectory(Externals)
 # header only libraries
-include_directories(Externals/variant Externals/optional Externals/function_ref)
+include_directories(
+	SYSTEM
+	Externals/variant
+	Externals/optional
+	Externals/function_ref
+)
 message("===============================================================")
 
 include_directories(Library)

@@ -2,9 +2,9 @@
 
 namespace mn {
 
-	template<int NumPageBits>
-    __device__ int Retrieve_Block_Local_Offset(int level, uint64_t blockOffset) {	///< the level number starts from 0
-		return (blockOffset >> (NumPageBits + level * 3)) & 7;
-	}
-
+template<int NumPageBits>
+__device__ int retrieve_block_local_offset(int level, uint64_t block_offset) {///< the level number starts from 0
+	return (block_offset >> (NumPageBits + level * 3)) & 7;
 }
+
+}// namespace mn

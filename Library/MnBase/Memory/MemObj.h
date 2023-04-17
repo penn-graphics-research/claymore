@@ -1,35 +1,35 @@
-#ifndef __MEM_OBJ_H_
-#define __MEM_OBJ_H_
+#ifndef MEM_OBJ_H
+#define MEM_OBJ_H
 
 namespace mn {
 
-    struct MemBackend {
-        using uchar = unsigned char;
-        enum class physical : uchar {
-            cpu = 0,
-            gpu = 1
-        };
-    };
+struct MemBackend {
+	using uchar = unsigned char;
 
-    struct MemResource {
-        union {
-			void* ptr;
-            uintptr_t ptrval;
-			uint64_t offset;    ///< only legal for 64-bit app
-		};
-    };
+	enum class Physical : uchar {
+		CPU = 0,
+		GPU = 1
+	};
+};
 
-    struct MemStack
-    {
-        char *top;
-        char *end;
-    };
+struct MemResource {
+	union {
+		void* ptr;
+		uintptr_t ptrval;
+		uint64_t offset;///< only legal for 64-bit app
+	};
+};
 
-    struct MemBlock {
-        void *mem;
-        std::size_t size;
-    };
+struct MemStack {
+	char* top;
+	char* end;
+};
 
-} // namespace mn
+struct MemBlock {
+	void* mem;
+	std::size_t size;
+};
+
+}// namespace mn
 
 #endif

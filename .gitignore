@@ -1,5 +1,8 @@
 .vscode
 build
+clang-format-all.bat
+clang-tidy-all.bat
+fix_compilation_database.py
 **/*.so
 **/*.exe.manifest
 **/*.exe

@@ -1,18 +1,27 @@
-#ifndef __PROBABILITY_H_
-#define __PROBABILITY_H_
+#ifndef PROBABILITY_H
+#define PROBABILITY_H
 
-#include <cmath>
-#include <cstdlib>
+#include <functional>
+#include <random>
 
 namespace mn {
 
-double PDF(int lambda, int k);
-int rand_p(double lambda);
-double anti_normal_PDF(double u, double o, int x);
+class Propability {
+	std::uniform_real_distribution<double> distribution;
+	std::random_device device;
+	std::mt19937 generator;
 
-double PDF(double u, double o, int x);
-int rand_normal(double u, double o);
-int rand_anti_normal(double u, double o);
-} // namespace mn
+	Propability();
+
+   public:
+	static double pdf(double lambda, int k);
+	int rand_p(double lambda);
+	static double anti_normal_pdf(double u, double o, double x);
+
+	static double pdf(double u, double o, double x);
+	int rand_normal(double u, double o);
+	int rand_anti_normal(double u, double o);
+};
+}// namespace mn
 
 #endif

@@ -1,10 +1,9 @@
-#ifndef __BVH_CUH_
-#define __BVH_CUH_
+#ifndef BVH_CUH
+#define BVH_CUH
 #include <stdint.h>
+
 #include <tuple>
 
-namespace mn {
-
-}
+namespace mn {}
 
 #endif

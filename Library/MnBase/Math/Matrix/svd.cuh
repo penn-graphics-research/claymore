@@ -1,9 +1,10 @@
-#ifndef __SVD3_CUH_
-#define __SVD3_CUH_
+#ifndef SVD3_CUH
+#define SVD3_CUH
 
 #include <cuda.h>
+
 #include "Utility.h"
-#include "math.h" // CUDA math library
+#include "math.h"// CUDA math library
 #include "qr.cuh"
 
 #define gone 1065353216
@@ -18,1164 +19,1216 @@ namespace mn {
 
 namespace math {
 
-union un {
-    float f;
-    unsigned int ui;
-};
+	union un {
+		float f;
+		unsigned int ui;
+	};
 
-template<typename T>
-__forceinline__ __device__ void svd(
-	T a11, T a12, T a13, T a21, T a22, T a23, T a31, T a32, T a33, // input A
-	T& u11, T& u12, T& u13, T& u21, T& u22, T& u23, T& u31, T& u32, T& u33, // output U
-	T& s11,
-	//float &s12, float &s13, float &s21,
-	T& s22,
-	//float &s23, float &s31, float &s32,
-	T& s33, // output S
-	T& v11, T& v12, T& v13, T& v21, T& v22, T& v23, T& v31, T& v32, T& v33 // output V
-)
-{
-	un Sa11, Sa21, Sa31, Sa12, Sa22, Sa32, Sa13, Sa23, Sa33;
-	un Su11, Su21, Su31, Su12, Su22, Su32, Su13, Su23, Su33;
-	un Sv11, Sv21, Sv31, Sv12, Sv22, Sv32, Sv13, Sv23, Sv33;
-	un Sc, Ss, Sch, Ssh;
-	un Stmp1, Stmp2, Stmp3, Stmp4, Stmp5;
-	un Ss11, Ss21, Ss31, Ss22, Ss32, Ss33;
-	un Sqvs, Sqvvx, Sqvvy, Sqvvz;
+	template<typename T>
+	__forceinline__ __device__ void svd(
+		T a11,
+		T a12,
+		T a13,
+		T a21,
+		T a22,
+		T a23,
+		T a31,
+		T a32,
+		T a33,// input A
+		T& u11,
+		T& u12,
+		T& u13,
+		T& u21,
+		T& u22,
+		T& u23,
+		T& u31,
+		T& u32,
+		T& u33,// output U
+		T& s11,
+		//float &s12, float &s13, float &s21,
+		T& s22,
+		//float &s23, float &s31, float &s32,
+		T& s33,// output S
+		T& v11,
+		T& v12,
+		T& v13,
+		T& v21,
+		T& v22,
+		T& v23,
+		T& v31,
+		T& v32,
+		T& v33// output V
+	) {
+		un s_a11;
+		un s_a21;
+		un s_a31;
+		un s_a12;
+		un s_a22;
+		un s_a32;
+		un s_a13;
+		un s_a23;
+		un s_a33;
+		un s_u11;
+		un s_u21;
+		un s_u31;
+		un s_u12;
+		un s_u22;
+		un s_u32;
+		un s_u13;
+		un s_u23;
+		un s_u33;
+		un s_v11;
+		un s_v21;
+		un s_v31;
+		un s_v12;
+		un s_v22;
+		un s_v32;
+		un s_v13;
+		un s_v23;
+		un s_v33;
+		un s_c;
+		un s_s;
+		un s_ch;
+		un s_sh;
+		un s_tmp1;
+		un s_tmp2;
+		un s_tmp3;
+		un s_tmp4;
+		un s_tmp5;
+		un s_s11;
+		un s_s21;
+		un s_s31;
+		un s_s22;
+		un s_s32;
+		un s_s33;
+		un s_qvs;
+		un s_qvvx;
+		un s_qvvy;
+		un s_qvvz;
 
-	Sa11.f = a11;
-	Sa12.f = a12;
-	Sa13.f = a13;
-	Sa21.f = a21;
-	Sa22.f = a22;
-	Sa23.f = a23;
-	Sa31.f = a31;
-	Sa32.f = a32;
-	Sa33.f = a33;
+		s_a11.f = a11;
+		s_a12.f = a12;
+		s_a13.f = a13;
+		s_a21.f = a21;
+		s_a22.f = a22;
+		s_a23.f = a23;
+		s_a31.f = a31;
+		s_a32.f = a32;
+		s_a33.f = a33;
 
-	//###########################################################
-	// Compute normal equations matrix
-	//###########################################################
+		//###########################################################
+		// Compute normal equations matrix
+		//###########################################################
 
-	Ss11.f = Sa11.f * Sa11.f;
-	Stmp1.f = Sa21.f * Sa21.f;
-	Ss11.f = __fadd_rn(Stmp1.f, Ss11.f);
-	Stmp1.f = Sa31.f * Sa31.f;
-	Ss11.f = __fadd_rn(Stmp1.f, Ss11.f);
+		s_s11.f	 = s_a11.f * s_a11.f;
+		s_tmp1.f = s_a21.f * s_a21.f;
+		s_s11.f	 = __fadd_rn(s_tmp1.f, s_s11.f);
+		s_tmp1.f = s_a31.f * s_a31.f;
+		s_s11.f	 = __fadd_rn(s_tmp1.f, s_s11.f);
 
-	Ss21.f = Sa12.f * Sa11.f;
-	Stmp1.f = Sa22.f * Sa21.f;
-	Ss21.f = __fadd_rn(Stmp1.f, Ss21.f);
-	Stmp1.f = Sa32.f * Sa31.f;
-	Ss21.f = __fadd_rn(Stmp1.f, Ss21.f);
+		s_s21.f	 = s_a12.f * s_a11.f;
+		s_tmp1.f = s_a22.f * s_a21.f;
+		s_s21.f	 = __fadd_rn(s_tmp1.f, s_s21.f);
+		s_tmp1.f = s_a32.f * s_a31.f;
+		s_s21.f	 = __fadd_rn(s_tmp1.f, s_s21.f);
 
-	Ss31.f = Sa13.f * Sa11.f;
-	Stmp1.f = Sa23.f * Sa21.f;
-	Ss31.f = __fadd_rn(Stmp1.f, Ss31.f);
-	Stmp1.f = Sa33.f * Sa31.f;
-	Ss31.f = __fadd_rn(Stmp1.f, Ss31.f);
+		s_s31.f	 = s_a13.f * s_a11.f;
+		s_tmp1.f = s_a23.f * s_a21.f;
+		s_s31.f	 = __fadd_rn(s_tmp1.f, s_s31.f);
+		s_tmp1.f = s_a33.f * s_a31.f;
+		s_s31.f	 = __fadd_rn(s_tmp1.f, s_s31.f);
 
-	Ss22.f = Sa12.f * Sa12.f;
-	Stmp1.f = Sa22.f * Sa22.f;
-	Ss22.f = __fadd_rn(Stmp1.f, Ss22.f);
-	Stmp1.f = Sa32.f * Sa32.f;
-	Ss22.f = __fadd_rn(Stmp1.f, Ss22.f);
+		s_s22.f	 = s_a12.f * s_a12.f;
+		s_tmp1.f = s_a22.f * s_a22.f;
+		s_s22.f	 = __fadd_rn(s_tmp1.f, s_s22.f);
+		s_tmp1.f = s_a32.f * s_a32.f;
+		s_s22.f	 = __fadd_rn(s_tmp1.f, s_s22.f);
 
-	Ss32.f = Sa13.f * Sa12.f;
-	Stmp1.f = Sa23.f * Sa22.f;
-	Ss32.f = __fadd_rn(Stmp1.f, Ss32.f);
-	Stmp1.f = Sa33.f * Sa32.f;
-	Ss32.f = __fadd_rn(Stmp1.f, Ss32.f);
+		s_s32.f	 = s_a13.f * s_a12.f;
+		s_tmp1.f = s_a23.f * s_a22.f;
+		s_s32.f	 = __fadd_rn(s_tmp1.f, s_s32.f);
+		s_tmp1.f = s_a33.f * s_a32.f;
+		s_s32.f	 = __fadd_rn(s_tmp1.f, s_s32.f);
 
-	Ss33.f = Sa13.f * Sa13.f;
-	Stmp1.f = Sa23.f * Sa23.f;
-	Ss33.f = __fadd_rn(Stmp1.f, Ss33.f);
-	Stmp1.f = Sa33.f * Sa33.f;
-	Ss33.f = __fadd_rn(Stmp1.f, Ss33.f);
+		s_s33.f	 = s_a13.f * s_a13.f;
+		s_tmp1.f = s_a23.f * s_a23.f;
+		s_s33.f	 = __fadd_rn(s_tmp1.f, s_s33.f);
+		s_tmp1.f = s_a33.f * s_a33.f;
+		s_s33.f	 = __fadd_rn(s_tmp1.f, s_s33.f);
 
-	Sqvs.f = 1.f;
-	Sqvvx.f = 0.f;
-	Sqvvy.f = 0.f;
-	Sqvvz.f = 0.f;
+		s_qvs.f	 = 1.f;
+		s_qvvx.f = 0.f;
+		s_qvvy.f = 0.f;
+		s_qvvz.f = 0.f;
 
-	//###########################################################
-	// Solve symmetric eigenproblem using Jacobi iteration
-	//###########################################################
-	for (int i = 0; i < 4; i++) {
-		Ssh.f = Ss21.f * 0.5f;
-		Stmp5.f = __fsub_rn(Ss11.f, Ss22.f);
+		//###########################################################
+		// Solve symmetric eigenproblem using Jacobi iteration
+		//###########################################################
+		for(int i = 0; i < 4; i++) {
+			s_sh.f	 = s_s21.f * 0.5f;
+			s_tmp5.f = __fsub_rn(s_s11.f, s_s22.f);
 
-		Stmp2.f = Ssh.f * Ssh.f;
-		Stmp1.ui = (Stmp2.f >= gtiny_number) ? 0xffffffff : 0;
-		Ssh.ui = Stmp1.ui & Ssh.ui;
-		Sch.ui = Stmp1.ui & Stmp5.ui;
-		Stmp2.ui = ~Stmp1.ui & gone;
-		Sch.ui = Sch.ui | Stmp2.ui;
+			s_tmp2.f  = s_sh.f * s_sh.f;
+			s_tmp1.ui = (s_tmp2.f >= gtiny_number) ? 0xffffffff : 0;
+			s_sh.ui	  = s_tmp1.ui & s_sh.ui;
+			s_ch.ui	  = s_tmp1.ui & s_tmp5.ui;
+			s_tmp2.ui = ~s_tmp1.ui & gone;
+			s_ch.ui	  = s_ch.ui | s_tmp2.ui;
 
-		Stmp1.f = Ssh.f * Ssh.f;
-		Stmp2.f = Sch.f * Sch.f;
-		Stmp3.f = __fadd_rn(Stmp1.f, Stmp2.f);
-		Stmp4.f = __frsqrt_rn(Stmp3.f);
+			s_tmp1.f = s_sh.f * s_sh.f;
+			s_tmp2.f = s_ch.f * s_ch.f;
+			s_tmp3.f = __fadd_rn(s_tmp1.f, s_tmp2.f);
+			s_tmp4.f = __frsqrt_rn(s_tmp3.f);
 
-		Ssh.f = Stmp4.f * Ssh.f;
-		Sch.f = Stmp4.f * Sch.f;
-		Stmp1.f = gfour_gamma_squared * Stmp1.f;
-		Stmp1.ui = (Stmp2.f <= Stmp1.f) ? 0xffffffff : 0;
+			s_sh.f	  = s_tmp4.f * s_sh.f;
+			s_ch.f	  = s_tmp4.f * s_ch.f;
+			s_tmp1.f  = gfour_gamma_squared * s_tmp1.f;
+			s_tmp1.ui = (s_tmp2.f <= s_tmp1.f) ? 0xffffffff : 0;
 
-		Stmp2.ui = gsine_pi_over_eight & Stmp1.ui;
-		Ssh.ui = ~Stmp1.ui & Ssh.ui;
-		Ssh.ui = Ssh.ui | Stmp2.ui;
-		Stmp2.ui = gcosine_pi_over_eight & Stmp1.ui;
-		Sch.ui = ~Stmp1.ui & Sch.ui;
-		Sch.ui = Sch.ui | Stmp2.ui;
+			s_tmp2.ui = gsine_pi_over_eight & s_tmp1.ui;
+			s_sh.ui	  = ~s_tmp1.ui & s_sh.ui;
+			s_sh.ui	  = s_sh.ui | s_tmp2.ui;
+			s_tmp2.ui = gcosine_pi_over_eight & s_tmp1.ui;
+			s_ch.ui	  = ~s_tmp1.ui & s_ch.ui;
+			s_ch.ui	  = s_ch.ui | s_tmp2.ui;
 
-		Stmp1.f = Ssh.f * Ssh.f;
-		Stmp2.f = Sch.f * Sch.f;
-		Sc.f = __fsub_rn(Stmp2.f, Stmp1.f);
-		Ss.f = Sch.f * Ssh.f;
-		Ss.f = __fadd_rn(Ss.f, Ss.f);
+			s_tmp1.f = s_sh.f * s_sh.f;
+			s_tmp2.f = s_ch.f * s_ch.f;
+			s_c.f	 = __fsub_rn(s_tmp2.f, s_tmp1.f);
+			s_s.f	 = s_ch.f * s_sh.f;
+			s_s.f	 = __fadd_rn(s_s.f, s_s.f);
 
 #ifdef DEBUG_JACOBI_CONJUGATE
-		printf("GPU s %.20g, c %.20g, sh %.20g, ch %.20g\n", Ss.f, Sc.f, Ssh.f, Sch.f);
+			printf("GPU s %.20g, c %.20g, sh %.20g, ch %.20g\n", s_s.f, s_c.f, s_sh.f, s_ch.f);
 #endif
-		//###########################################################
-		// Perform the actual Givens conjugation
-		//###########################################################
+			//###########################################################
+			// Perform the actual Givens conjugation
+			//###########################################################
 
-		Stmp3.f = __fadd_rn(Stmp1.f, Stmp2.f);
-		Ss33.f = Ss33.f * Stmp3.f;
-		Ss31.f = Ss31.f * Stmp3.f;
-		Ss32.f = Ss32.f * Stmp3.f;
-		Ss33.f = Ss33.f * Stmp3.f;
+			s_tmp3.f = __fadd_rn(s_tmp1.f, s_tmp2.f);
+			s_s33.f	 = s_s33.f * s_tmp3.f;
+			s_s31.f	 = s_s31.f * s_tmp3.f;
+			s_s32.f	 = s_s32.f * s_tmp3.f;
+			s_s33.f	 = s_s33.f * s_tmp3.f;
 
-		Stmp1.f = Ss.f * Ss31.f;
-		Stmp2.f = Ss.f * Ss32.f;
-		Ss31.f = Sc.f * Ss31.f;
-		Ss32.f = Sc.f * Ss32.f;
-		Ss31.f = __fadd_rn(Stmp2.f, Ss31.f);
-		Ss32.f = __fsub_rn(Ss32.f, Stmp1.f);
+			s_tmp1.f = s_s.f * s_s31.f;
+			s_tmp2.f = s_s.f * s_s32.f;
+			s_s31.f	 = s_c.f * s_s31.f;
+			s_s32.f	 = s_c.f * s_s32.f;
+			s_s31.f	 = __fadd_rn(s_tmp2.f, s_s31.f);
+			s_s32.f	 = __fsub_rn(s_s32.f, s_tmp1.f);
 
-		Stmp2.f = Ss.f * Ss.f;
-		Stmp1.f = Ss22.f * Stmp2.f;
-		Stmp3.f = Ss11.f * Stmp2.f;
-		Stmp4.f = Sc.f * Sc.f;
-		Ss11.f = Ss11.f * Stmp4.f;
-		Ss22.f = Ss22.f * Stmp4.f;
-		Ss11.f = __fadd_rn(Ss11.f, Stmp1.f);
-		Ss22.f = __fadd_rn(Ss22.f, Stmp3.f);
-		Stmp4.f = __fsub_rn(Stmp4.f, Stmp2.f);
-		Stmp2.f = __fadd_rn(Ss21.f, Ss21.f);
-		Ss21.f = Ss21.f * Stmp4.f;
-		Stmp4.f = Sc.f * Ss.f;
-		Stmp2.f = Stmp2.f * Stmp4.f;
-		Stmp5.f = Stmp5.f * Stmp4.f;
-		Ss11.f = __fadd_rn(Ss11.f, Stmp2.f);
-		Ss21.f = __fsub_rn(Ss21.f, Stmp5.f);
-		Ss22.f = __fsub_rn(Ss22.f, Stmp2.f);
-
-#ifdef DEBUG_JACOBI_CONJUGATE
-		printf("%.20g\n", Ss11.f);
-		printf("%.20g %.20g\n", Ss21.f, Ss22.f);
-		printf("%.20g %.20g %.20g\n", Ss31.f, Ss32.f, Ss33.f);
-#endif
-
-		//###########################################################
-		// Compute the cumulative rotation, in quaternion form
-		//###########################################################
-
-		Stmp1.f = Ssh.f * Sqvvx.f;
-		Stmp2.f = Ssh.f * Sqvvy.f;
-		Stmp3.f = Ssh.f * Sqvvz.f;
-		Ssh.f = Ssh.f * Sqvs.f;
-
-		Sqvs.f = Sch.f * Sqvs.f;
-		Sqvvx.f = Sch.f * Sqvvx.f;
-		Sqvvy.f = Sch.f * Sqvvy.f;
-		Sqvvz.f = Sch.f * Sqvvz.f;
-
-		Sqvvz.f = __fadd_rn(Sqvvz.f, Ssh.f);
-		Sqvs.f = __fsub_rn(Sqvs.f, Stmp3.f);
-		Sqvvx.f = __fadd_rn(Sqvvx.f, Stmp2.f);
-		Sqvvy.f = __fsub_rn(Sqvvy.f, Stmp1.f);
+			s_tmp2.f = s_s.f * s_s.f;
+			s_tmp1.f = s_s22.f * s_tmp2.f;
+			s_tmp3.f = s_s11.f * s_tmp2.f;
+			s_tmp4.f = s_c.f * s_c.f;
+			s_s11.f	 = s_s11.f * s_tmp4.f;
+			s_s22.f	 = s_s22.f * s_tmp4.f;
+			s_s11.f	 = __fadd_rn(s_s11.f, s_tmp1.f);
+			s_s22.f	 = __fadd_rn(s_s22.f, s_tmp3.f);
+			s_tmp4.f = __fsub_rn(s_tmp4.f, s_tmp2.f);
+			s_tmp2.f = __fadd_rn(s_s21.f, s_s21.f);
+			s_s21.f	 = s_s21.f * s_tmp4.f;
+			s_tmp4.f = s_c.f * s_s.f;
+			s_tmp2.f = s_tmp2.f * s_tmp4.f;
+			s_tmp5.f = s_tmp5.f * s_tmp4.f;
+			s_s11.f	 = __fadd_rn(s_s11.f, s_tmp2.f);
+			s_s21.f	 = __fsub_rn(s_s21.f, s_tmp5.f);
+			s_s22.f	 = __fsub_rn(s_s22.f, s_tmp2.f);
 
 #ifdef DEBUG_JACOBI_CONJUGATE
-		printf("GPU q %.20g %.20g %.20g %.20g\n", Sqvvx.f, Sqvvy.f, Sqvvz.f, Sqvs.f);
-#endif
-
-		//////////////////////////////////////////////////////////////////////////
-		// (1->3)
-		//////////////////////////////////////////////////////////////////////////
-		Ssh.f = Ss32.f * 0.5f;
-		Stmp5.f = __fsub_rn(Ss22.f, Ss33.f);
-
-		Stmp2.f = Ssh.f * Ssh.f;
-		Stmp1.ui = (Stmp2.f >= gtiny_number) ? 0xffffffff : 0;
-		Ssh.ui = Stmp1.ui & Ssh.ui;
-		Sch.ui = Stmp1.ui & Stmp5.ui;
-		Stmp2.ui = ~Stmp1.ui & gone;
-		Sch.ui = Sch.ui | Stmp2.ui;
-
-		Stmp1.f = Ssh.f * Ssh.f;
-		Stmp2.f = Sch.f * Sch.f;
-		Stmp3.f = __fadd_rn(Stmp1.f, Stmp2.f);
-		Stmp4.f = __frsqrt_rn(Stmp3.f);
-
-		Ssh.f = Stmp4.f * Ssh.f;
-		Sch.f = Stmp4.f * Sch.f;
-		Stmp1.f = gfour_gamma_squared * Stmp1.f;
-		Stmp1.ui = (Stmp2.f <= Stmp1.f) ? 0xffffffff : 0;
-
-		Stmp2.ui = gsine_pi_over_eight & Stmp1.ui;
-		Ssh.ui = ~Stmp1.ui & Ssh.ui;
-		Ssh.ui = Ssh.ui | Stmp2.ui;
-		Stmp2.ui = gcosine_pi_over_eight & Stmp1.ui;
-		Sch.ui = ~Stmp1.ui & Sch.ui;
-		Sch.ui = Sch.ui | Stmp2.ui;
-
-		Stmp1.f = Ssh.f * Ssh.f;
-		Stmp2.f = Sch.f * Sch.f;
-		Sc.f = __fsub_rn(Stmp2.f, Stmp1.f);
-		Ss.f = Sch.f * Ssh.f;
-		Ss.f = __fadd_rn(Ss.f, Ss.f);
-
-#ifdef DEBUG_JACOBI_CONJUGATE
-		printf("GPU s %.20g, c %.20g, sh %.20g, ch %.20g\n", Ss.f, Sc.f, Ssh.f, Sch.f);
-#endif
-
-		//###########################################################
-		// Perform the actual Givens conjugation
-		//###########################################################
-
-		Stmp3.f = __fadd_rn(Stmp1.f, Stmp2.f);
-		Ss11.f = Ss11.f * Stmp3.f;
-		Ss21.f = Ss21.f * Stmp3.f;
-		Ss31.f = Ss31.f * Stmp3.f;
-		Ss11.f = Ss11.f * Stmp3.f;
-
-		Stmp1.f = Ss.f * Ss21.f;
-		Stmp2.f = Ss.f * Ss31.f;
-		Ss21.f = Sc.f * Ss21.f;
-		Ss31.f = Sc.f * Ss31.f;
-		Ss21.f = __fadd_rn(Stmp2.f, Ss21.f);
-		Ss31.f = __fsub_rn(Ss31.f, Stmp1.f);
-
-		Stmp2.f = Ss.f * Ss.f;
-		Stmp1.f = Ss33.f * Stmp2.f;
-		Stmp3.f = Ss22.f * Stmp2.f;
-		Stmp4.f = Sc.f * Sc.f;
-		Ss22.f = Ss22.f * Stmp4.f;
-		Ss33.f = Ss33.f * Stmp4.f;
-		Ss22.f = __fadd_rn(Ss22.f, Stmp1.f);
-		Ss33.f = __fadd_rn(Ss33.f, Stmp3.f);
-		Stmp4.f = __fsub_rn(Stmp4.f, Stmp2.f);
-		Stmp2.f = __fadd_rn(Ss32.f, Ss32.f);
-		Ss32.f = Ss32.f * Stmp4.f;
-		Stmp4.f = Sc.f * Ss.f;
-		Stmp2.f = Stmp2.f * Stmp4.f;
-		Stmp5.f = Stmp5.f * Stmp4.f;
-		Ss22.f = __fadd_rn(Ss22.f, Stmp2.f);
-		Ss32.f = __fsub_rn(Ss32.f, Stmp5.f);
-		Ss33.f = __fsub_rn(Ss33.f, Stmp2.f);
-
-#ifdef DEBUG_JACOBI_CONJUGATE
-		printf("%.20g\n", Ss11.f);
-		printf("%.20g %.20g\n", Ss21.f, Ss22.f);
-		printf("%.20g %.20g %.20g\n", Ss31.f, Ss32.f, Ss33.f);
+			printf("%.20g\n", s_s11.f);
+			printf("%.20g %.20g\n", s_s21.f, s_s22.f);
+			printf("%.20g %.20g %.20g\n", s_s31.f, s_s32.f, s_s33.f);
 #endif
 
-		//###########################################################
-		// Compute the cumulative rotation, in quaternion form
-		//###########################################################
+			//###########################################################
+			// Compute the cumulative rotation, in quaternion form
+			//###########################################################
 
-		Stmp1.f = Ssh.f * Sqvvx.f;
-		Stmp2.f = Ssh.f * Sqvvy.f;
-		Stmp3.f = Ssh.f * Sqvvz.f;
-		Ssh.f = Ssh.f * Sqvs.f;
+			s_tmp1.f = s_sh.f * s_qvvx.f;
+			s_tmp2.f = s_sh.f * s_qvvy.f;
+			s_tmp3.f = s_sh.f * s_qvvz.f;
+			s_sh.f	 = s_sh.f * s_qvs.f;
 
-		Sqvs.f = Sch.f * Sqvs.f;
-		Sqvvx.f = Sch.f * Sqvvx.f;
-		Sqvvy.f = Sch.f * Sqvvy.f;
-		Sqvvz.f = Sch.f * Sqvvz.f;
+			s_qvs.f	 = s_ch.f * s_qvs.f;
+			s_qvvx.f = s_ch.f * s_qvvx.f;
+			s_qvvy.f = s_ch.f * s_qvvy.f;
+			s_qvvz.f = s_ch.f * s_qvvz.f;
 
-		Sqvvx.f = __fadd_rn(Sqvvx.f, Ssh.f);
-		Sqvs.f = __fsub_rn(Sqvs.f, Stmp1.f);
-		Sqvvy.f = __fadd_rn(Sqvvy.f, Stmp3.f);
-		Sqvvz.f = __fsub_rn(Sqvvz.f, Stmp2.f);
+			s_qvvz.f = __fadd_rn(s_qvvz.f, s_sh.f);
+			s_qvs.f	 = __fsub_rn(s_qvs.f, s_tmp3.f);
+			s_qvvx.f = __fadd_rn(s_qvvx.f, s_tmp2.f);
+			s_qvvy.f = __fsub_rn(s_qvvy.f, s_tmp1.f);
 
 #ifdef DEBUG_JACOBI_CONJUGATE
-		printf("GPU q %.20g %.20g %.20g %.20g\n", Sqvvx.f, Sqvvy.f, Sqvvz.f, Sqvs.f);
+			printf("GPU q %.20g %.20g %.20g %.20g\n", s_qvvx.f, s_qvvy.f, s_qvvz.f, s_qvs.f);
+#endif
+
+			//////////////////////////////////////////////////////////////////////////
+			// (1->3)
+			//////////////////////////////////////////////////////////////////////////
+			s_sh.f	 = s_s32.f * 0.5f;
+			s_tmp5.f = __fsub_rn(s_s22.f, s_s33.f);
+
+			s_tmp2.f  = s_sh.f * s_sh.f;
+			s_tmp1.ui = (s_tmp2.f >= gtiny_number) ? 0xffffffff : 0;
+			s_sh.ui	  = s_tmp1.ui & s_sh.ui;
+			s_ch.ui	  = s_tmp1.ui & s_tmp5.ui;
+			s_tmp2.ui = ~s_tmp1.ui & gone;
+			s_ch.ui	  = s_ch.ui | s_tmp2.ui;
+
+			s_tmp1.f = s_sh.f * s_sh.f;
+			s_tmp2.f = s_ch.f * s_ch.f;
+			s_tmp3.f = __fadd_rn(s_tmp1.f, s_tmp2.f);
+			s_tmp4.f = __frsqrt_rn(s_tmp3.f);
+
+			s_sh.f	  = s_tmp4.f * s_sh.f;
+			s_ch.f	  = s_tmp4.f * s_ch.f;
+			s_tmp1.f  = gfour_gamma_squared * s_tmp1.f;
+			s_tmp1.ui = (s_tmp2.f <= s_tmp1.f) ? 0xffffffff : 0;
+
+			s_tmp2.ui = gsine_pi_over_eight & s_tmp1.ui;
+			s_sh.ui	  = ~s_tmp1.ui & s_sh.ui;
+			s_sh.ui	  = s_sh.ui | s_tmp2.ui;
+			s_tmp2.ui = gcosine_pi_over_eight & s_tmp1.ui;
+			s_ch.ui	  = ~s_tmp1.ui & s_ch.ui;
+			s_ch.ui	  = s_ch.ui | s_tmp2.ui;
+
+			s_tmp1.f = s_sh.f * s_sh.f;
+			s_tmp2.f = s_ch.f * s_ch.f;
+			s_c.f	 = __fsub_rn(s_tmp2.f, s_tmp1.f);
+			s_s.f	 = s_ch.f * s_sh.f;
+			s_s.f	 = __fadd_rn(s_s.f, s_s.f);
+
+#ifdef DEBUG_JACOBI_CONJUGATE
+			printf("GPU s %.20g, c %.20g, sh %.20g, ch %.20g\n", s_s.f, s_c.f, s_sh.f, s_ch.f);
+#endif
+
+			//###########################################################
+			// Perform the actual Givens conjugation
+			//###########################################################
+
+			s_tmp3.f = __fadd_rn(s_tmp1.f, s_tmp2.f);
+			s_s11.f	 = s_s11.f * s_tmp3.f;
+			s_s21.f	 = s_s21.f * s_tmp3.f;
+			s_s31.f	 = s_s31.f * s_tmp3.f;
+			s_s11.f	 = s_s11.f * s_tmp3.f;
+
+			s_tmp1.f = s_s.f * s_s21.f;
+			s_tmp2.f = s_s.f * s_s31.f;
+			s_s21.f	 = s_c.f * s_s21.f;
+			s_s31.f	 = s_c.f * s_s31.f;
+			s_s21.f	 = __fadd_rn(s_tmp2.f, s_s21.f);
+			s_s31.f	 = __fsub_rn(s_s31.f, s_tmp1.f);
+
+			s_tmp2.f = s_s.f * s_s.f;
+			s_tmp1.f = s_s33.f * s_tmp2.f;
+			s_tmp3.f = s_s22.f * s_tmp2.f;
+			s_tmp4.f = s_c.f * s_c.f;
+			s_s22.f	 = s_s22.f * s_tmp4.f;
+			s_s33.f	 = s_s33.f * s_tmp4.f;
+			s_s22.f	 = __fadd_rn(s_s22.f, s_tmp1.f);
+			s_s33.f	 = __fadd_rn(s_s33.f, s_tmp3.f);
+			s_tmp4.f = __fsub_rn(s_tmp4.f, s_tmp2.f);
+			s_tmp2.f = __fadd_rn(s_s32.f, s_s32.f);
+			s_s32.f	 = s_s32.f * s_tmp4.f;
+			s_tmp4.f = s_c.f * s_s.f;
+			s_tmp2.f = s_tmp2.f * s_tmp4.f;
+			s_tmp5.f = s_tmp5.f * s_tmp4.f;
+			s_s22.f	 = __fadd_rn(s_s22.f, s_tmp2.f);
+			s_s32.f	 = __fsub_rn(s_s32.f, s_tmp5.f);
+			s_s33.f	 = __fsub_rn(s_s33.f, s_tmp2.f);
+
+#ifdef DEBUG_JACOBI_CONJUGATE
+			printf("%.20g\n", s_s11.f);
+			printf("%.20g %.20g\n", s_s21.f, s_s22.f);
+			printf("%.20g %.20g %.20g\n", s_s31.f, s_s32.f, s_s33.f);
+#endif
+
+			//###########################################################
+			// Compute the cumulative rotation, in quaternion form
+			//###########################################################
+
+			s_tmp1.f = s_sh.f * s_qvvx.f;
+			s_tmp2.f = s_sh.f * s_qvvy.f;
+			s_tmp3.f = s_sh.f * s_qvvz.f;
+			s_sh.f	 = s_sh.f * s_qvs.f;
+
+			s_qvs.f	 = s_ch.f * s_qvs.f;
+			s_qvvx.f = s_ch.f * s_qvvx.f;
+			s_qvvy.f = s_ch.f * s_qvvy.f;
+			s_qvvz.f = s_ch.f * s_qvvz.f;
+
+			s_qvvx.f = __fadd_rn(s_qvvx.f, s_sh.f);
+			s_qvs.f	 = __fsub_rn(s_qvs.f, s_tmp1.f);
+			s_qvvy.f = __fadd_rn(s_qvvy.f, s_tmp3.f);
+			s_qvvz.f = __fsub_rn(s_qvvz.f, s_tmp2.f);
+
+#ifdef DEBUG_JACOBI_CONJUGATE
+			printf("GPU q %.20g %.20g %.20g %.20g\n", s_qvvx.f, s_qvvy.f, s_qvvz.f, s_qvs.f);
 #endif
 #if 1
-		//////////////////////////////////////////////////////////////////////////
-		// 1 -> 2
-		//////////////////////////////////////////////////////////////////////////
+			//////////////////////////////////////////////////////////////////////////
+			// 1 -> 2
+			//////////////////////////////////////////////////////////////////////////
 
-		Ssh.f = Ss31.f * 0.5f;
-		Stmp5.f = __fsub_rn(Ss33.f, Ss11.f);
+			s_sh.f	 = s_s31.f * 0.5f;
+			s_tmp5.f = __fsub_rn(s_s33.f, s_s11.f);
 
-		Stmp2.f = Ssh.f * Ssh.f;
-		Stmp1.ui = (Stmp2.f >= gtiny_number) ? 0xffffffff : 0;
-		Ssh.ui = Stmp1.ui & Ssh.ui;
-		Sch.ui = Stmp1.ui & Stmp5.ui;
-		Stmp2.ui = ~Stmp1.ui & gone;
-		Sch.ui = Sch.ui | Stmp2.ui;
+			s_tmp2.f  = s_sh.f * s_sh.f;
+			s_tmp1.ui = (s_tmp2.f >= gtiny_number) ? 0xffffffff : 0;
+			s_sh.ui	  = s_tmp1.ui & s_sh.ui;
+			s_ch.ui	  = s_tmp1.ui & s_tmp5.ui;
+			s_tmp2.ui = ~s_tmp1.ui & gone;
+			s_ch.ui	  = s_ch.ui | s_tmp2.ui;
 
-		Stmp1.f = Ssh.f * Ssh.f;
-		Stmp2.f = Sch.f * Sch.f;
-		Stmp3.f = __fadd_rn(Stmp1.f, Stmp2.f);
-		Stmp4.f = __frsqrt_rn(Stmp3.f);
+			s_tmp1.f = s_sh.f * s_sh.f;
+			s_tmp2.f = s_ch.f * s_ch.f;
+			s_tmp3.f = __fadd_rn(s_tmp1.f, s_tmp2.f);
+			s_tmp4.f = __frsqrt_rn(s_tmp3.f);
 
-		Ssh.f = Stmp4.f * Ssh.f;
-		Sch.f = Stmp4.f * Sch.f;
-		Stmp1.f = gfour_gamma_squared * Stmp1.f;
-		Stmp1.ui = (Stmp2.f <= Stmp1.f) ? 0xffffffff : 0;
+			s_sh.f	  = s_tmp4.f * s_sh.f;
+			s_ch.f	  = s_tmp4.f * s_ch.f;
+			s_tmp1.f  = gfour_gamma_squared * s_tmp1.f;
+			s_tmp1.ui = (s_tmp2.f <= s_tmp1.f) ? 0xffffffff : 0;
 
-		Stmp2.ui = gsine_pi_over_eight & Stmp1.ui;
-		Ssh.ui = ~Stmp1.ui & Ssh.ui;
-		Ssh.ui = Ssh.ui | Stmp2.ui;
-		Stmp2.ui = gcosine_pi_over_eight & Stmp1.ui;
-		Sch.ui = ~Stmp1.ui & Sch.ui;
-		Sch.ui = Sch.ui | Stmp2.ui;
+			s_tmp2.ui = gsine_pi_over_eight & s_tmp1.ui;
+			s_sh.ui	  = ~s_tmp1.ui & s_sh.ui;
+			s_sh.ui	  = s_sh.ui | s_tmp2.ui;
+			s_tmp2.ui = gcosine_pi_over_eight & s_tmp1.ui;
+			s_ch.ui	  = ~s_tmp1.ui & s_ch.ui;
+			s_ch.ui	  = s_ch.ui | s_tmp2.ui;
 
-		Stmp1.f = Ssh.f * Ssh.f;
-		Stmp2.f = Sch.f * Sch.f;
-		Sc.f = __fsub_rn(Stmp2.f, Stmp1.f);
-		Ss.f = Sch.f * Ssh.f;
-		Ss.f = __fadd_rn(Ss.f, Ss.f);
+			s_tmp1.f = s_sh.f * s_sh.f;
+			s_tmp2.f = s_ch.f * s_ch.f;
+			s_c.f	 = __fsub_rn(s_tmp2.f, s_tmp1.f);
+			s_s.f	 = s_ch.f * s_sh.f;
+			s_s.f	 = __fadd_rn(s_s.f, s_s.f);
 
-#ifdef DEBUG_JACOBI_CONJUGATE
-		printf("GPU s %.20g, c %.20g, sh %.20g, ch %.20g\n", Ss.f, Sc.f, Ssh.f, Sch.f);
+#	ifdef DEBUG_JACOBI_CONJUGATE
+			printf("GPU s %.20g, c %.20g, sh %.20g, ch %.20g\n", s_s.f, s_c.f, s_sh.f, s_ch.f);
+#	endif
+
+			//###########################################################
+			// Perform the actual Givens conjugation
+			//###########################################################
+
+			s_tmp3.f = __fadd_rn(s_tmp1.f, s_tmp2.f);
+			s_s22.f	 = s_s22.f * s_tmp3.f;
+			s_s32.f	 = s_s32.f * s_tmp3.f;
+			s_s21.f	 = s_s21.f * s_tmp3.f;
+			s_s22.f	 = s_s22.f * s_tmp3.f;
+
+			s_tmp1.f = s_s.f * s_s32.f;
+			s_tmp2.f = s_s.f * s_s21.f;
+			s_s32.f	 = s_c.f * s_s32.f;
+			s_s21.f	 = s_c.f * s_s21.f;
+			s_s32.f	 = __fadd_rn(s_tmp2.f, s_s32.f);
+			s_s21.f	 = __fsub_rn(s_s21.f, s_tmp1.f);
+
+			s_tmp2.f = s_s.f * s_s.f;
+			s_tmp1.f = s_s11.f * s_tmp2.f;
+			s_tmp3.f = s_s33.f * s_tmp2.f;
+			s_tmp4.f = s_c.f * s_c.f;
+			s_s33.f	 = s_s33.f * s_tmp4.f;
+			s_s11.f	 = s_s11.f * s_tmp4.f;
+			s_s33.f	 = __fadd_rn(s_s33.f, s_tmp1.f);
+			s_s11.f	 = __fadd_rn(s_s11.f, s_tmp3.f);
+			s_tmp4.f = __fsub_rn(s_tmp4.f, s_tmp2.f);
+			s_tmp2.f = __fadd_rn(s_s31.f, s_s31.f);
+			s_s31.f	 = s_s31.f * s_tmp4.f;
+			s_tmp4.f = s_c.f * s_s.f;
+			s_tmp2.f = s_tmp2.f * s_tmp4.f;
+			s_tmp5.f = s_tmp5.f * s_tmp4.f;
+			s_s33.f	 = __fadd_rn(s_s33.f, s_tmp2.f);
+			s_s31.f	 = __fsub_rn(s_s31.f, s_tmp5.f);
+			s_s11.f	 = __fsub_rn(s_s11.f, s_tmp2.f);
+
+#	ifdef DEBUG_JACOBI_CONJUGATE
+			printf("%.20g\n", s_s11.f);
+			printf("%.20g %.20g\n", s_s21.f, s_s22.f);
+			printf("%.20g %.20g %.20g\n", s_s31.f, s_s32.f, s_s33.f);
+#	endif
+
+			//###########################################################
+			// Compute the cumulative rotation, in quaternion form
+			//###########################################################
+
+			s_tmp1.f = s_sh.f * s_qvvx.f;
+			s_tmp2.f = s_sh.f * s_qvvy.f;
+			s_tmp3.f = s_sh.f * s_qvvz.f;
+			s_sh.f	 = s_sh.f * s_qvs.f;
+
+			s_qvs.f	 = s_ch.f * s_qvs.f;
+			s_qvvx.f = s_ch.f * s_qvvx.f;
+			s_qvvy.f = s_ch.f * s_qvvy.f;
+			s_qvvz.f = s_ch.f * s_qvvz.f;
+
+			s_qvvy.f = __fadd_rn(s_qvvy.f, s_sh.f);
+			s_qvs.f	 = __fsub_rn(s_qvs.f, s_tmp2.f);
+			s_qvvz.f = __fadd_rn(s_qvvz.f, s_tmp1.f);
+			s_qvvx.f = __fsub_rn(s_qvvx.f, s_tmp3.f);
 #endif
+		}
 
 		//###########################################################
-		// Perform the actual Givens conjugation
+		// Normalize quaternion for matrix V
 		//###########################################################
 
-		Stmp3.f = __fadd_rn(Stmp1.f, Stmp2.f);
-		Ss22.f = Ss22.f * Stmp3.f;
-		Ss32.f = Ss32.f * Stmp3.f;
-		Ss21.f = Ss21.f * Stmp3.f;
-		Ss22.f = Ss22.f * Stmp3.f;
+		s_tmp2.f = s_qvs.f * s_qvs.f;
+		s_tmp1.f = s_qvvx.f * s_qvvx.f;
+		s_tmp2.f = __fadd_rn(s_tmp1.f, s_tmp2.f);
+		s_tmp1.f = s_qvvy.f * s_qvvy.f;
+		s_tmp2.f = __fadd_rn(s_tmp1.f, s_tmp2.f);
+		s_tmp1.f = s_qvvz.f * s_qvvz.f;
+		s_tmp2.f = __fadd_rn(s_tmp1.f, s_tmp2.f);
 
-		Stmp1.f = Ss.f * Ss32.f;
-		Stmp2.f = Ss.f * Ss21.f;
-		Ss32.f = Sc.f * Ss32.f;
-		Ss21.f = Sc.f * Ss21.f;
-		Ss32.f = __fadd_rn(Stmp2.f, Ss32.f);
-		Ss21.f = __fsub_rn(Ss21.f, Stmp1.f);
+		s_tmp1.f = __frsqrt_rn(s_tmp2.f);
+		s_tmp4.f = s_tmp1.f * 0.5f;
+		s_tmp3.f = s_tmp1.f * s_tmp4.f;
+		s_tmp3.f = s_tmp1.f * s_tmp3.f;
+		s_tmp3.f = s_tmp2.f * s_tmp3.f;
+		s_tmp1.f = __fadd_rn(s_tmp1.f, s_tmp4.f);
+		s_tmp1.f = __fsub_rn(s_tmp1.f, s_tmp3.f);
 
-		Stmp2.f = Ss.f * Ss.f;
-		Stmp1.f = Ss11.f * Stmp2.f;
-		Stmp3.f = Ss33.f * Stmp2.f;
-		Stmp4.f = Sc.f * Sc.f;
-		Ss33.f = Ss33.f * Stmp4.f;
-		Ss11.f = Ss11.f * Stmp4.f;
-		Ss33.f = __fadd_rn(Ss33.f, Stmp1.f);
-		Ss11.f = __fadd_rn(Ss11.f, Stmp3.f);
-		Stmp4.f = __fsub_rn(Stmp4.f, Stmp2.f);
-		Stmp2.f = __fadd_rn(Ss31.f, Ss31.f);
-		Ss31.f = Ss31.f * Stmp4.f;
-		Stmp4.f = Sc.f * Ss.f;
-		Stmp2.f = Stmp2.f * Stmp4.f;
-		Stmp5.f = Stmp5.f * Stmp4.f;
-		Ss33.f = __fadd_rn(Ss33.f, Stmp2.f);
-		Ss31.f = __fsub_rn(Ss31.f, Stmp5.f);
-		Ss11.f = __fsub_rn(Ss11.f, Stmp2.f);
-
-#ifdef DEBUG_JACOBI_CONJUGATE
-		printf("%.20g\n", Ss11.f);
-		printf("%.20g %.20g\n", Ss21.f, Ss22.f);
-		printf("%.20g %.20g %.20g\n", Ss31.f, Ss32.f, Ss33.f);
-#endif
+		s_qvs.f	 = s_qvs.f * s_tmp1.f;
+		s_qvvx.f = s_qvvx.f * s_tmp1.f;
+		s_qvvy.f = s_qvvy.f * s_tmp1.f;
+		s_qvvz.f = s_qvvz.f * s_tmp1.f;
 
 		//###########################################################
-		// Compute the cumulative rotation, in quaternion form
+		// Transform quaternion to matrix V
 		//###########################################################
 
-		Stmp1.f = Ssh.f * Sqvvx.f;
-		Stmp2.f = Ssh.f * Sqvvy.f;
-		Stmp3.f = Ssh.f * Sqvvz.f;
-		Ssh.f = Ssh.f * Sqvs.f;
+		s_tmp1.f = s_qvvx.f * s_qvvx.f;
+		s_tmp2.f = s_qvvy.f * s_qvvy.f;
+		s_tmp3.f = s_qvvz.f * s_qvvz.f;
+		s_v11.f	 = s_qvs.f * s_qvs.f;
+		s_v22.f	 = __fsub_rn(s_v11.f, s_tmp1.f);
+		s_v33.f	 = __fsub_rn(s_v22.f, s_tmp2.f);
+		s_v33.f	 = __fadd_rn(s_v33.f, s_tmp3.f);
+		s_v22.f	 = __fadd_rn(s_v22.f, s_tmp2.f);
+		s_v22.f	 = __fsub_rn(s_v22.f, s_tmp3.f);
+		s_v11.f	 = __fadd_rn(s_v11.f, s_tmp1.f);
+		s_v11.f	 = __fsub_rn(s_v11.f, s_tmp2.f);
+		s_v11.f	 = __fsub_rn(s_v11.f, s_tmp3.f);
+		s_tmp1.f = __fadd_rn(s_qvvx.f, s_qvvx.f);
+		s_tmp2.f = __fadd_rn(s_qvvy.f, s_qvvy.f);
+		s_tmp3.f = __fadd_rn(s_qvvz.f, s_qvvz.f);
+		s_v32.f	 = s_qvs.f * s_tmp1.f;
+		s_v13.f	 = s_qvs.f * s_tmp2.f;
+		s_v21.f	 = s_qvs.f * s_tmp3.f;
+		s_tmp1.f = s_qvvy.f * s_tmp1.f;
+		s_tmp2.f = s_qvvz.f * s_tmp2.f;
+		s_tmp3.f = s_qvvx.f * s_tmp3.f;
+		s_v12.f	 = __fsub_rn(s_tmp1.f, s_v21.f);
+		s_v23.f	 = __fsub_rn(s_tmp2.f, s_v32.f);
+		s_v31.f	 = __fsub_rn(s_tmp3.f, s_v13.f);
+		s_v21.f	 = __fadd_rn(s_tmp1.f, s_v21.f);
+		s_v32.f	 = __fadd_rn(s_tmp2.f, s_v32.f);
+		s_v13.f	 = __fadd_rn(s_tmp3.f, s_v13.f);
 
-		Sqvs.f = Sch.f * Sqvs.f;
-		Sqvvx.f = Sch.f * Sqvvx.f;
-		Sqvvy.f = Sch.f * Sqvvy.f;
-		Sqvvz.f = Sch.f * Sqvvz.f;
+		///###########################################################
+		// Multiply (from the right) with V
+		//###########################################################
 
-		Sqvvy.f = __fadd_rn(Sqvvy.f, Ssh.f);
-		Sqvs.f = __fsub_rn(Sqvs.f, Stmp2.f);
-		Sqvvz.f = __fadd_rn(Sqvvz.f, Stmp1.f);
-		Sqvvx.f = __fsub_rn(Sqvvx.f, Stmp3.f);
-#endif
+		s_tmp2.f = s_a12.f;
+		s_tmp3.f = s_a13.f;
+		s_a12.f	 = s_v12.f * s_a11.f;
+		s_a13.f	 = s_v13.f * s_a11.f;
+		s_a11.f	 = s_v11.f * s_a11.f;
+		s_tmp1.f = s_v21.f * s_tmp2.f;
+		s_a11.f	 = __fadd_rn(s_a11.f, s_tmp1.f);
+		s_tmp1.f = s_v31.f * s_tmp3.f;
+		s_a11.f	 = __fadd_rn(s_a11.f, s_tmp1.f);
+		s_tmp1.f = s_v22.f * s_tmp2.f;
+		s_a12.f	 = __fadd_rn(s_a12.f, s_tmp1.f);
+		s_tmp1.f = s_v32.f * s_tmp3.f;
+		s_a12.f	 = __fadd_rn(s_a12.f, s_tmp1.f);
+		s_tmp1.f = s_v23.f * s_tmp2.f;
+		s_a13.f	 = __fadd_rn(s_a13.f, s_tmp1.f);
+		s_tmp1.f = s_v33.f * s_tmp3.f;
+		s_a13.f	 = __fadd_rn(s_a13.f, s_tmp1.f);
+
+		s_tmp2.f = s_a22.f;
+		s_tmp3.f = s_a23.f;
+		s_a22.f	 = s_v12.f * s_a21.f;
+		s_a23.f	 = s_v13.f * s_a21.f;
+		s_a21.f	 = s_v11.f * s_a21.f;
+		s_tmp1.f = s_v21.f * s_tmp2.f;
+		s_a21.f	 = __fadd_rn(s_a21.f, s_tmp1.f);
+		s_tmp1.f = s_v31.f * s_tmp3.f;
+		s_a21.f	 = __fadd_rn(s_a21.f, s_tmp1.f);
+		s_tmp1.f = s_v22.f * s_tmp2.f;
+		s_a22.f	 = __fadd_rn(s_a22.f, s_tmp1.f);
+		s_tmp1.f = s_v32.f * s_tmp3.f;
+		s_a22.f	 = __fadd_rn(s_a22.f, s_tmp1.f);
+		s_tmp1.f = s_v23.f * s_tmp2.f;
+		s_a23.f	 = __fadd_rn(s_a23.f, s_tmp1.f);
+		s_tmp1.f = s_v33.f * s_tmp3.f;
+		s_a23.f	 = __fadd_rn(s_a23.f, s_tmp1.f);
+
+		s_tmp2.f = s_a32.f;
+		s_tmp3.f = s_a33.f;
+		s_a32.f	 = s_v12.f * s_a31.f;
+		s_a33.f	 = s_v13.f * s_a31.f;
+		s_a31.f	 = s_v11.f * s_a31.f;
+		s_tmp1.f = s_v21.f * s_tmp2.f;
+		s_a31.f	 = __fadd_rn(s_a31.f, s_tmp1.f);
+		s_tmp1.f = s_v31.f * s_tmp3.f;
+		s_a31.f	 = __fadd_rn(s_a31.f, s_tmp1.f);
+		s_tmp1.f = s_v22.f * s_tmp2.f;
+		s_a32.f	 = __fadd_rn(s_a32.f, s_tmp1.f);
+		s_tmp1.f = s_v32.f * s_tmp3.f;
+		s_a32.f	 = __fadd_rn(s_a32.f, s_tmp1.f);
+		s_tmp1.f = s_v23.f * s_tmp2.f;
+		s_a33.f	 = __fadd_rn(s_a33.f, s_tmp1.f);
+		s_tmp1.f = s_v33.f * s_tmp3.f;
+		s_a33.f	 = __fadd_rn(s_a33.f, s_tmp1.f);
+
+		//###########################################################
+		// Permute columns such that the singular values are sorted
+		//###########################################################
+
+		s_tmp1.f = s_a11.f * s_a11.f;
+		s_tmp4.f = s_a21.f * s_a21.f;
+		s_tmp1.f = __fadd_rn(s_tmp1.f, s_tmp4.f);
+		s_tmp4.f = s_a31.f * s_a31.f;
+		s_tmp1.f = __fadd_rn(s_tmp1.f, s_tmp4.f);
+
+		s_tmp2.f = s_a12.f * s_a12.f;
+		s_tmp4.f = s_a22.f * s_a22.f;
+		s_tmp2.f = __fadd_rn(s_tmp2.f, s_tmp4.f);
+		s_tmp4.f = s_a32.f * s_a32.f;
+		s_tmp2.f = __fadd_rn(s_tmp2.f, s_tmp4.f);
+
+		s_tmp3.f = s_a13.f * s_a13.f;
+		s_tmp4.f = s_a23.f * s_a23.f;
+		s_tmp3.f = __fadd_rn(s_tmp3.f, s_tmp4.f);
+		s_tmp4.f = s_a33.f * s_a33.f;
+		s_tmp3.f = __fadd_rn(s_tmp3.f, s_tmp4.f);
+
+		// Swap columns 1-2 if necessary
+
+		s_tmp4.ui = (s_tmp1.f < s_tmp2.f) ? 0xffffffff : 0;
+		s_tmp5.ui = s_a11.ui ^ s_a12.ui;
+		s_tmp5.ui = s_tmp5.ui & s_tmp4.ui;
+		s_a11.ui  = s_a11.ui ^ s_tmp5.ui;
+		s_a12.ui  = s_a12.ui ^ s_tmp5.ui;
+
+		s_tmp5.ui = s_a21.ui ^ s_a22.ui;
+		s_tmp5.ui = s_tmp5.ui & s_tmp4.ui;
+		s_a21.ui  = s_a21.ui ^ s_tmp5.ui;
+		s_a22.ui  = s_a22.ui ^ s_tmp5.ui;
+
+		s_tmp5.ui = s_a31.ui ^ s_a32.ui;
+		s_tmp5.ui = s_tmp5.ui & s_tmp4.ui;
+		s_a31.ui  = s_a31.ui ^ s_tmp5.ui;
+		s_a32.ui  = s_a32.ui ^ s_tmp5.ui;
+
+		s_tmp5.ui = s_v11.ui ^ s_v12.ui;
+		s_tmp5.ui = s_tmp5.ui & s_tmp4.ui;
+		s_v11.ui  = s_v11.ui ^ s_tmp5.ui;
+		s_v12.ui  = s_v12.ui ^ s_tmp5.ui;
+
+		s_tmp5.ui = s_v21.ui ^ s_v22.ui;
+		s_tmp5.ui = s_tmp5.ui & s_tmp4.ui;
+		s_v21.ui  = s_v21.ui ^ s_tmp5.ui;
+		s_v22.ui  = s_v22.ui ^ s_tmp5.ui;
+
+		s_tmp5.ui = s_v31.ui ^ s_v32.ui;
+		s_tmp5.ui = s_tmp5.ui & s_tmp4.ui;
+		s_v31.ui  = s_v31.ui ^ s_tmp5.ui;
+		s_v32.ui  = s_v32.ui ^ s_tmp5.ui;
+
+		s_tmp5.ui = s_tmp1.ui ^ s_tmp2.ui;
+		s_tmp5.ui = s_tmp5.ui & s_tmp4.ui;
+		s_tmp1.ui = s_tmp1.ui ^ s_tmp5.ui;
+		s_tmp2.ui = s_tmp2.ui ^ s_tmp5.ui;
+
+		// If columns 1-2 have been swapped, negate 2nd column of A and V so that V is still a rotation
+
+		s_tmp5.f  = -2.f;
+		s_tmp5.ui = s_tmp5.ui & s_tmp4.ui;
+		s_tmp4.f  = 1.f;
+		s_tmp4.f  = __fadd_rn(s_tmp4.f, s_tmp5.f);
+
+		s_a12.f = s_a12.f * s_tmp4.f;
+		s_a22.f = s_a22.f * s_tmp4.f;
+		s_a32.f = s_a32.f * s_tmp4.f;
+
+		s_v12.f = s_v12.f * s_tmp4.f;
+		s_v22.f = s_v22.f * s_tmp4.f;
+		s_v32.f = s_v32.f * s_tmp4.f;
+
+		// Swap columns 1-3 if necessary
+
+		s_tmp4.ui = (s_tmp1.f < s_tmp3.f) ? 0xffffffff : 0;
+		s_tmp5.ui = s_a11.ui ^ s_a13.ui;
+		s_tmp5.ui = s_tmp5.ui & s_tmp4.ui;
+		s_a11.ui  = s_a11.ui ^ s_tmp5.ui;
+		s_a13.ui  = s_a13.ui ^ s_tmp5.ui;
+
+		s_tmp5.ui = s_a21.ui ^ s_a23.ui;
+		s_tmp5.ui = s_tmp5.ui & s_tmp4.ui;
+		s_a21.ui  = s_a21.ui ^ s_tmp5.ui;
+		s_a23.ui  = s_a23.ui ^ s_tmp5.ui;
+
+		s_tmp5.ui = s_a31.ui ^ s_a33.ui;
+		s_tmp5.ui = s_tmp5.ui & s_tmp4.ui;
+		s_a31.ui  = s_a31.ui ^ s_tmp5.ui;
+		s_a33.ui  = s_a33.ui ^ s_tmp5.ui;
+
+		s_tmp5.ui = s_v11.ui ^ s_v13.ui;
+		s_tmp5.ui = s_tmp5.ui & s_tmp4.ui;
+		s_v11.ui  = s_v11.ui ^ s_tmp5.ui;
+		s_v13.ui  = s_v13.ui ^ s_tmp5.ui;
+
+		s_tmp5.ui = s_v21.ui ^ s_v23.ui;
+		s_tmp5.ui = s_tmp5.ui & s_tmp4.ui;
+		s_v21.ui  = s_v21.ui ^ s_tmp5.ui;
+		s_v23.ui  = s_v23.ui ^ s_tmp5.ui;
+
+		s_tmp5.ui = s_v31.ui ^ s_v33.ui;
+		s_tmp5.ui = s_tmp5.ui & s_tmp4.ui;
+		s_v31.ui  = s_v31.ui ^ s_tmp5.ui;
+		s_v33.ui  = s_v33.ui ^ s_tmp5.ui;
+
+		s_tmp5.ui = s_tmp1.ui ^ s_tmp3.ui;
+		s_tmp5.ui = s_tmp5.ui & s_tmp4.ui;
+		s_tmp1.ui = s_tmp1.ui ^ s_tmp5.ui;
+		s_tmp3.ui = s_tmp3.ui ^ s_tmp5.ui;
+
+		// If columns 1-3 have been swapped, negate 1st column of A and V so that V is still a rotation
+
+		s_tmp5.f  = -2.f;
+		s_tmp5.ui = s_tmp5.ui & s_tmp4.ui;
+		s_tmp4.f  = 1.f;
+		s_tmp4.f  = __fadd_rn(s_tmp4.f, s_tmp5.f);
+
+		s_a11.f = s_a11.f * s_tmp4.f;
+		s_a21.f = s_a21.f * s_tmp4.f;
+		s_a31.f = s_a31.f * s_tmp4.f;
+
+		s_v11.f = s_v11.f * s_tmp4.f;
+		s_v21.f = s_v21.f * s_tmp4.f;
+		s_v31.f = s_v31.f * s_tmp4.f;
+
+		// Swap columns 2-3 if necessary
+
+		s_tmp4.ui = (s_tmp2.f < s_tmp3.f) ? 0xffffffff : 0;
+		s_tmp5.ui = s_a12.ui ^ s_a13.ui;
+		s_tmp5.ui = s_tmp5.ui & s_tmp4.ui;
+		s_a12.ui  = s_a12.ui ^ s_tmp5.ui;
+		s_a13.ui  = s_a13.ui ^ s_tmp5.ui;
+
+		s_tmp5.ui = s_a22.ui ^ s_a23.ui;
+		s_tmp5.ui = s_tmp5.ui & s_tmp4.ui;
+		s_a22.ui  = s_a22.ui ^ s_tmp5.ui;
+		s_a23.ui  = s_a23.ui ^ s_tmp5.ui;
+
+		s_tmp5.ui = s_a32.ui ^ s_a33.ui;
+		s_tmp5.ui = s_tmp5.ui & s_tmp4.ui;
+		s_a32.ui  = s_a32.ui ^ s_tmp5.ui;
+		s_a33.ui  = s_a33.ui ^ s_tmp5.ui;
+
+		s_tmp5.ui = s_v12.ui ^ s_v13.ui;
+		s_tmp5.ui = s_tmp5.ui & s_tmp4.ui;
+		s_v12.ui  = s_v12.ui ^ s_tmp5.ui;
+		s_v13.ui  = s_v13.ui ^ s_tmp5.ui;
+
+		s_tmp5.ui = s_v22.ui ^ s_v23.ui;
+		s_tmp5.ui = s_tmp5.ui & s_tmp4.ui;
+		s_v22.ui  = s_v22.ui ^ s_tmp5.ui;
+		s_v23.ui  = s_v23.ui ^ s_tmp5.ui;
+
+		s_tmp5.ui = s_v32.ui ^ s_v33.ui;
+		s_tmp5.ui = s_tmp5.ui & s_tmp4.ui;
+		s_v32.ui  = s_v32.ui ^ s_tmp5.ui;
+		s_v33.ui  = s_v33.ui ^ s_tmp5.ui;
+
+		s_tmp5.ui = s_tmp2.ui ^ s_tmp3.ui;
+		s_tmp5.ui = s_tmp5.ui & s_tmp4.ui;
+		s_tmp2.ui = s_tmp2.ui ^ s_tmp5.ui;
+		s_tmp3.ui = s_tmp3.ui ^ s_tmp5.ui;
+
+		// If columns 2-3 have been swapped, negate 3rd column of A and V so that V is still a rotation
+
+		s_tmp5.f  = -2.f;
+		s_tmp5.ui = s_tmp5.ui & s_tmp4.ui;
+		s_tmp4.f  = 1.f;
+		s_tmp4.f  = __fadd_rn(s_tmp4.f, s_tmp5.f);
+
+		s_a13.f = s_a13.f * s_tmp4.f;
+		s_a23.f = s_a23.f * s_tmp4.f;
+		s_a33.f = s_a33.f * s_tmp4.f;
+
+		s_v13.f = s_v13.f * s_tmp4.f;
+		s_v23.f = s_v23.f * s_tmp4.f;
+		s_v33.f = s_v33.f * s_tmp4.f;
+
+		//###########################################################
+		// Construct QR factorization of A*V (=U*D) using Givens rotations
+		//###########################################################
+
+		s_u11.f = 1.f;
+		s_u12.f = 0.f;
+		s_u13.f = 0.f;
+		s_u21.f = 0.f;
+		s_u22.f = 1.f;
+		s_u23.f = 0.f;
+		s_u31.f = 0.f;
+		s_u32.f = 0.f;
+		s_u33.f = 1.f;
+
+		s_sh.f	= s_a21.f * s_a21.f;
+		s_sh.ui = (s_sh.f >= gsmall_number) ? 0xffffffff : 0;
+		s_sh.ui = s_sh.ui & s_a21.ui;
+
+		s_tmp5.f  = 0.f;
+		s_ch.f	  = __fsub_rn(s_tmp5.f, s_a11.f);
+		s_ch.f	  = max(s_ch.f, s_a11.f);
+		s_ch.f	  = max(s_ch.f, gsmall_number);
+		s_tmp5.ui = (s_a11.f >= s_tmp5.f) ? 0xffffffff : 0;
+
+		s_tmp1.f = s_ch.f * s_ch.f;
+		s_tmp2.f = s_sh.f * s_sh.f;
+		s_tmp2.f = __fadd_rn(s_tmp1.f, s_tmp2.f);
+		s_tmp1.f = __frsqrt_rn(s_tmp2.f);
+
+		s_tmp4.f = s_tmp1.f * 0.5f;
+		s_tmp3.f = s_tmp1.f * s_tmp4.f;
+		s_tmp3.f = s_tmp1.f * s_tmp3.f;
+		s_tmp3.f = s_tmp2.f * s_tmp3.f;
+		s_tmp1.f = __fadd_rn(s_tmp1.f, s_tmp4.f);
+		s_tmp1.f = __fsub_rn(s_tmp1.f, s_tmp3.f);
+		s_tmp1.f = s_tmp1.f * s_tmp2.f;
+
+		s_ch.f = __fadd_rn(s_ch.f, s_tmp1.f);
+
+		s_tmp1.ui = ~s_tmp5.ui & s_sh.ui;
+		s_tmp2.ui = ~s_tmp5.ui & s_ch.ui;
+		s_ch.ui	  = s_tmp5.ui & s_ch.ui;
+		s_sh.ui	  = s_tmp5.ui & s_sh.ui;
+		s_ch.ui	  = s_ch.ui | s_tmp1.ui;
+		s_sh.ui	  = s_sh.ui | s_tmp2.ui;
+
+		s_tmp1.f = s_ch.f * s_ch.f;
+		s_tmp2.f = s_sh.f * s_sh.f;
+		s_tmp2.f = __fadd_rn(s_tmp1.f, s_tmp2.f);
+		s_tmp1.f = __frsqrt_rn(s_tmp2.f);
+
+		s_tmp4.f = s_tmp1.f * 0.5f;
+		s_tmp3.f = s_tmp1.f * s_tmp4.f;
+		s_tmp3.f = s_tmp1.f * s_tmp3.f;
+		s_tmp3.f = s_tmp2.f * s_tmp3.f;
+		s_tmp1.f = __fadd_rn(s_tmp1.f, s_tmp4.f);
+		s_tmp1.f = __fsub_rn(s_tmp1.f, s_tmp3.f);
+
+		s_ch.f = s_ch.f * s_tmp1.f;
+		s_sh.f = s_sh.f * s_tmp1.f;
+
+		s_c.f = s_ch.f * s_ch.f;
+		s_s.f = s_sh.f * s_sh.f;
+		s_c.f = __fsub_rn(s_c.f, s_s.f);
+		s_s.f = s_sh.f * s_ch.f;
+		s_s.f = __fadd_rn(s_s.f, s_s.f);
+
+		//###########################################################
+		// Rotate matrix A
+		//###########################################################
+
+		s_tmp1.f = s_s.f * s_a11.f;
+		s_tmp2.f = s_s.f * s_a21.f;
+		s_a11.f	 = s_c.f * s_a11.f;
+		s_a21.f	 = s_c.f * s_a21.f;
+		s_a11.f	 = __fadd_rn(s_a11.f, s_tmp2.f);
+		s_a21.f	 = __fsub_rn(s_a21.f, s_tmp1.f);
+
+		s_tmp1.f = s_s.f * s_a12.f;
+		s_tmp2.f = s_s.f * s_a22.f;
+		s_a12.f	 = s_c.f * s_a12.f;
+		s_a22.f	 = s_c.f * s_a22.f;
+		s_a12.f	 = __fadd_rn(s_a12.f, s_tmp2.f);
+		s_a22.f	 = __fsub_rn(s_a22.f, s_tmp1.f);
+
+		s_tmp1.f = s_s.f * s_a13.f;
+		s_tmp2.f = s_s.f * s_a23.f;
+		s_a13.f	 = s_c.f * s_a13.f;
+		s_a23.f	 = s_c.f * s_a23.f;
+		s_a13.f	 = __fadd_rn(s_a13.f, s_tmp2.f);
+		s_a23.f	 = __fsub_rn(s_a23.f, s_tmp1.f);
+
+		//###########################################################
+		// Update matrix U
+		//###########################################################
+
+		s_tmp1.f = s_s.f * s_u11.f;
+		s_tmp2.f = s_s.f * s_u12.f;
+		s_u11.f	 = s_c.f * s_u11.f;
+		s_u12.f	 = s_c.f * s_u12.f;
+		s_u11.f	 = __fadd_rn(s_u11.f, s_tmp2.f);
+		s_u12.f	 = __fsub_rn(s_u12.f, s_tmp1.f);
+
+		s_tmp1.f = s_s.f * s_u21.f;
+		s_tmp2.f = s_s.f * s_u22.f;
+		s_u21.f	 = s_c.f * s_u21.f;
+		s_u22.f	 = s_c.f * s_u22.f;
+		s_u21.f	 = __fadd_rn(s_u21.f, s_tmp2.f);
+		s_u22.f	 = __fsub_rn(s_u22.f, s_tmp1.f);
+
+		s_tmp1.f = s_s.f * s_u31.f;
+		s_tmp2.f = s_s.f * s_u32.f;
+		s_u31.f	 = s_c.f * s_u31.f;
+		s_u32.f	 = s_c.f * s_u32.f;
+		s_u31.f	 = __fadd_rn(s_u31.f, s_tmp2.f);
+		s_u32.f	 = __fsub_rn(s_u32.f, s_tmp1.f);
+
+		// Second Givens rotation
+
+		s_sh.f	= s_a31.f * s_a31.f;
+		s_sh.ui = (s_sh.f >= gsmall_number) ? 0xffffffff : 0;
+		s_sh.ui = s_sh.ui & s_a31.ui;
+
+		s_tmp5.f  = 0.f;
+		s_ch.f	  = __fsub_rn(s_tmp5.f, s_a11.f);
+		s_ch.f	  = max(s_ch.f, s_a11.f);
+		s_ch.f	  = max(s_ch.f, gsmall_number);
+		s_tmp5.ui = (s_a11.f >= s_tmp5.f) ? 0xffffffff : 0;
+
+		s_tmp1.f = s_ch.f * s_ch.f;
+		s_tmp2.f = s_sh.f * s_sh.f;
+		s_tmp2.f = __fadd_rn(s_tmp1.f, s_tmp2.f);
+		s_tmp1.f = __frsqrt_rn(s_tmp2.f);
+
+		s_tmp4.f = s_tmp1.f * 0.5;
+		s_tmp3.f = s_tmp1.f * s_tmp4.f;
+		s_tmp3.f = s_tmp1.f * s_tmp3.f;
+		s_tmp3.f = s_tmp2.f * s_tmp3.f;
+		s_tmp1.f = __fadd_rn(s_tmp1.f, s_tmp4.f);
+		s_tmp1.f = __fsub_rn(s_tmp1.f, s_tmp3.f);
+		s_tmp1.f = s_tmp1.f * s_tmp2.f;
+
+		s_ch.f = __fadd_rn(s_ch.f, s_tmp1.f);
+
+		s_tmp1.ui = ~s_tmp5.ui & s_sh.ui;
+		s_tmp2.ui = ~s_tmp5.ui & s_ch.ui;
+		s_ch.ui	  = s_tmp5.ui & s_ch.ui;
+		s_sh.ui	  = s_tmp5.ui & s_sh.ui;
+		s_ch.ui	  = s_ch.ui | s_tmp1.ui;
+		s_sh.ui	  = s_sh.ui | s_tmp2.ui;
+
+		s_tmp1.f = s_ch.f * s_ch.f;
+		s_tmp2.f = s_sh.f * s_sh.f;
+		s_tmp2.f = __fadd_rn(s_tmp1.f, s_tmp2.f);
+		s_tmp1.f = __frsqrt_rn(s_tmp2.f);
+
+		s_tmp4.f = s_tmp1.f * 0.5f;
+		s_tmp3.f = s_tmp1.f * s_tmp4.f;
+		s_tmp3.f = s_tmp1.f * s_tmp3.f;
+		s_tmp3.f = s_tmp2.f * s_tmp3.f;
+		s_tmp1.f = __fadd_rn(s_tmp1.f, s_tmp4.f);
+		s_tmp1.f = __fsub_rn(s_tmp1.f, s_tmp3.f);
+
+		s_ch.f = s_ch.f * s_tmp1.f;
+		s_sh.f = s_sh.f * s_tmp1.f;
+
+		s_c.f = s_ch.f * s_ch.f;
+		s_s.f = s_sh.f * s_sh.f;
+		s_c.f = __fsub_rn(s_c.f, s_s.f);
+		s_s.f = s_sh.f * s_ch.f;
+		s_s.f = __fadd_rn(s_s.f, s_s.f);
+
+		//###########################################################
+		// Rotate matrix A
+		//###########################################################
+
+		s_tmp1.f = s_s.f * s_a11.f;
+		s_tmp2.f = s_s.f * s_a31.f;
+		s_a11.f	 = s_c.f * s_a11.f;
+		s_a31.f	 = s_c.f * s_a31.f;
+		s_a11.f	 = __fadd_rn(s_a11.f, s_tmp2.f);
+		s_a31.f	 = __fsub_rn(s_a31.f, s_tmp1.f);
+
+		s_tmp1.f = s_s.f * s_a12.f;
+		s_tmp2.f = s_s.f * s_a32.f;
+		s_a12.f	 = s_c.f * s_a12.f;
+		s_a32.f	 = s_c.f * s_a32.f;
+		s_a12.f	 = __fadd_rn(s_a12.f, s_tmp2.f);
+		s_a32.f	 = __fsub_rn(s_a32.f, s_tmp1.f);
+
+		s_tmp1.f = s_s.f * s_a13.f;
+		s_tmp2.f = s_s.f * s_a33.f;
+		s_a13.f	 = s_c.f * s_a13.f;
+		s_a33.f	 = s_c.f * s_a33.f;
+		s_a13.f	 = __fadd_rn(s_a13.f, s_tmp2.f);
+		s_a33.f	 = __fsub_rn(s_a33.f, s_tmp1.f);
+
+		//###########################################################
+		// Update matrix U
+		//###########################################################
+
+		s_tmp1.f = s_s.f * s_u11.f;
+		s_tmp2.f = s_s.f * s_u13.f;
+		s_u11.f	 = s_c.f * s_u11.f;
+		s_u13.f	 = s_c.f * s_u13.f;
+		s_u11.f	 = __fadd_rn(s_u11.f, s_tmp2.f);
+		s_u13.f	 = __fsub_rn(s_u13.f, s_tmp1.f);
+
+		s_tmp1.f = s_s.f * s_u21.f;
+		s_tmp2.f = s_s.f * s_u23.f;
+		s_u21.f	 = s_c.f * s_u21.f;
+		s_u23.f	 = s_c.f * s_u23.f;
+		s_u21.f	 = __fadd_rn(s_u21.f, s_tmp2.f);
+		s_u23.f	 = __fsub_rn(s_u23.f, s_tmp1.f);
+
+		s_tmp1.f = s_s.f * s_u31.f;
+		s_tmp2.f = s_s.f * s_u33.f;
+		s_u31.f	 = s_c.f * s_u31.f;
+		s_u33.f	 = s_c.f * s_u33.f;
+		s_u31.f	 = __fadd_rn(s_u31.f, s_tmp2.f);
+		s_u33.f	 = __fsub_rn(s_u33.f, s_tmp1.f);
+
+		// Third Givens Rotation
+
+		s_sh.f	= s_a32.f * s_a32.f;
+		s_sh.ui = (s_sh.f >= gsmall_number) ? 0xffffffff : 0;
+		s_sh.ui = s_sh.ui & s_a32.ui;
+
+		s_tmp5.f  = 0.f;
+		s_ch.f	  = __fsub_rn(s_tmp5.f, s_a22.f);
+		s_ch.f	  = max(s_ch.f, s_a22.f);
+		s_ch.f	  = max(s_ch.f, gsmall_number);
+		s_tmp5.ui = (s_a22.f >= s_tmp5.f) ? 0xffffffff : 0;
+
+		s_tmp1.f = s_ch.f * s_ch.f;
+		s_tmp2.f = s_sh.f * s_sh.f;
+		s_tmp2.f = __fadd_rn(s_tmp1.f, s_tmp2.f);
+		s_tmp1.f = __frsqrt_rn(s_tmp2.f);
+
+		s_tmp4.f = s_tmp1.f * 0.5f;
+		s_tmp3.f = s_tmp1.f * s_tmp4.f;
+		s_tmp3.f = s_tmp1.f * s_tmp3.f;
+		s_tmp3.f = s_tmp2.f * s_tmp3.f;
+		s_tmp1.f = __fadd_rn(s_tmp1.f, s_tmp4.f);
+		s_tmp1.f = __fsub_rn(s_tmp1.f, s_tmp3.f);
+		s_tmp1.f = s_tmp1.f * s_tmp2.f;
+
+		s_ch.f = __fadd_rn(s_ch.f, s_tmp1.f);
+
+		s_tmp1.ui = ~s_tmp5.ui & s_sh.ui;
+		s_tmp2.ui = ~s_tmp5.ui & s_ch.ui;
+		s_ch.ui	  = s_tmp5.ui & s_ch.ui;
+		s_sh.ui	  = s_tmp5.ui & s_sh.ui;
+		s_ch.ui	  = s_ch.ui | s_tmp1.ui;
+		s_sh.ui	  = s_sh.ui | s_tmp2.ui;
+
+		s_tmp1.f = s_ch.f * s_ch.f;
+		s_tmp2.f = s_sh.f * s_sh.f;
+		s_tmp2.f = __fadd_rn(s_tmp1.f, s_tmp2.f);
+		s_tmp1.f = __frsqrt_rn(s_tmp2.f);
+
+		s_tmp4.f = s_tmp1.f * 0.5f;
+		s_tmp3.f = s_tmp1.f * s_tmp4.f;
+		s_tmp3.f = s_tmp1.f * s_tmp3.f;
+		s_tmp3.f = s_tmp2.f * s_tmp3.f;
+		s_tmp1.f = __fadd_rn(s_tmp1.f, s_tmp4.f);
+		s_tmp1.f = __fsub_rn(s_tmp1.f, s_tmp3.f);
+
+		s_ch.f = s_ch.f * s_tmp1.f;
+		s_sh.f = s_sh.f * s_tmp1.f;
+
+		s_c.f = s_ch.f * s_ch.f;
+		s_s.f = s_sh.f * s_sh.f;
+		s_c.f = __fsub_rn(s_c.f, s_s.f);
+		s_s.f = s_sh.f * s_ch.f;
+		s_s.f = __fadd_rn(s_s.f, s_s.f);
+
+		//###########################################################
+		// Rotate matrix A
+		//###########################################################
+
+		s_tmp1.f = s_s.f * s_a21.f;
+		s_tmp2.f = s_s.f * s_a31.f;
+		s_a21.f	 = s_c.f * s_a21.f;
+		s_a31.f	 = s_c.f * s_a31.f;
+		s_a21.f	 = __fadd_rn(s_a21.f, s_tmp2.f);
+		s_a31.f	 = __fsub_rn(s_a31.f, s_tmp1.f);
+
+		s_tmp1.f = s_s.f * s_a22.f;
+		s_tmp2.f = s_s.f * s_a32.f;
+		s_a22.f	 = s_c.f * s_a22.f;
+		s_a32.f	 = s_c.f * s_a32.f;
+		s_a22.f	 = __fadd_rn(s_a22.f, s_tmp2.f);
+		s_a32.f	 = __fsub_rn(s_a32.f, s_tmp1.f);
+
+		s_tmp1.f = s_s.f * s_a23.f;
+		s_tmp2.f = s_s.f * s_a33.f;
+		s_a23.f	 = s_c.f * s_a23.f;
+		s_a33.f	 = s_c.f * s_a33.f;
+		s_a23.f	 = __fadd_rn(s_a23.f, s_tmp2.f);
+		s_a33.f	 = __fsub_rn(s_a33.f, s_tmp1.f);
+
+		//###########################################################
+		// Update matrix U
+		//###########################################################
+
+		s_tmp1.f = s_s.f * s_u12.f;
+		s_tmp2.f = s_s.f * s_u13.f;
+		s_u12.f	 = s_c.f * s_u12.f;
+		s_u13.f	 = s_c.f * s_u13.f;
+		s_u12.f	 = __fadd_rn(s_u12.f, s_tmp2.f);
+		s_u13.f	 = __fsub_rn(s_u13.f, s_tmp1.f);
+
+		s_tmp1.f = s_s.f * s_u22.f;
+		s_tmp2.f = s_s.f * s_u23.f;
+		s_u22.f	 = s_c.f * s_u22.f;
+		s_u23.f	 = s_c.f * s_u23.f;
+		s_u22.f	 = __fadd_rn(s_u22.f, s_tmp2.f);
+		s_u23.f	 = __fsub_rn(s_u23.f, s_tmp1.f);
+
+		s_tmp1.f = s_s.f * s_u32.f;
+		s_tmp2.f = s_s.f * s_u33.f;
+		s_u32.f	 = s_c.f * s_u32.f;
+		s_u33.f	 = s_c.f * s_u33.f;
+		s_u32.f	 = __fadd_rn(s_u32.f, s_tmp2.f);
+		s_u33.f	 = __fsub_rn(s_u33.f, s_tmp1.f);
+
+		v11 = s_v11.f;
+		v12 = s_v12.f;
+		v13 = s_v13.f;
+		v21 = s_v21.f;
+		v22 = s_v22.f;
+		v23 = s_v23.f;
+		v31 = s_v31.f;
+		v32 = s_v32.f;
+		v33 = s_v33.f;
+
+		u11 = s_u11.f;
+		u12 = s_u12.f;
+		u13 = s_u13.f;
+		u21 = s_u21.f;
+		u22 = s_u22.f;
+		u23 = s_u23.f;
+		u31 = s_u31.f;
+		u32 = s_u32.f;
+		u33 = s_u33.f;
+
+		s11 = s_a11.f;
+		//s12 = s_a12.f; s13 = s_a13.f; s21 = s_a21.f;
+		s22 = s_a22.f;
+		//s23 = s_a23.f; s31 = s_a31.f; s32 = s_a32.f;
+		s33 = s_a33.f;
 	}
 
-	//###########################################################
-	// Normalize quaternion for matrix V
-	//###########################################################
-
-	Stmp2.f = Sqvs.f * Sqvs.f;
-	Stmp1.f = Sqvvx.f * Sqvvx.f;
-	Stmp2.f = __fadd_rn(Stmp1.f, Stmp2.f);
-	Stmp1.f = Sqvvy.f * Sqvvy.f;
-	Stmp2.f = __fadd_rn(Stmp1.f, Stmp2.f);
-	Stmp1.f = Sqvvz.f * Sqvvz.f;
-	Stmp2.f = __fadd_rn(Stmp1.f, Stmp2.f);
-
-	Stmp1.f = __frsqrt_rn(Stmp2.f);
-	Stmp4.f = Stmp1.f * 0.5f;
-	Stmp3.f = Stmp1.f * Stmp4.f;
-	Stmp3.f = Stmp1.f * Stmp3.f;
-	Stmp3.f = Stmp2.f * Stmp3.f;
-	Stmp1.f = __fadd_rn(Stmp1.f, Stmp4.f);
-	Stmp1.f = __fsub_rn(Stmp1.f, Stmp3.f);
-
-	Sqvs.f = Sqvs.f * Stmp1.f;
-	Sqvvx.f = Sqvvx.f * Stmp1.f;
-	Sqvvy.f = Sqvvy.f * Stmp1.f;
-	Sqvvz.f = Sqvvz.f * Stmp1.f;
-
-	//###########################################################
-	// Transform quaternion to matrix V
-	//###########################################################
-
-	Stmp1.f = Sqvvx.f * Sqvvx.f;
-	Stmp2.f = Sqvvy.f * Sqvvy.f;
-	Stmp3.f = Sqvvz.f * Sqvvz.f;
-	Sv11.f = Sqvs.f * Sqvs.f;
-	Sv22.f = __fsub_rn(Sv11.f, Stmp1.f);
-	Sv33.f = __fsub_rn(Sv22.f, Stmp2.f);
-	Sv33.f = __fadd_rn(Sv33.f, Stmp3.f);
-	Sv22.f = __fadd_rn(Sv22.f, Stmp2.f);
-	Sv22.f = __fsub_rn(Sv22.f, Stmp3.f);
-	Sv11.f = __fadd_rn(Sv11.f, Stmp1.f);
-	Sv11.f = __fsub_rn(Sv11.f, Stmp2.f);
-	Sv11.f = __fsub_rn(Sv11.f, Stmp3.f);
-	Stmp1.f = __fadd_rn(Sqvvx.f, Sqvvx.f);
-	Stmp2.f = __fadd_rn(Sqvvy.f, Sqvvy.f);
-	Stmp3.f = __fadd_rn(Sqvvz.f, Sqvvz.f);
-	Sv32.f = Sqvs.f * Stmp1.f;
-	Sv13.f = Sqvs.f * Stmp2.f;
-	Sv21.f = Sqvs.f * Stmp3.f;
-	Stmp1.f = Sqvvy.f * Stmp1.f;
-	Stmp2.f = Sqvvz.f * Stmp2.f;
-	Stmp3.f = Sqvvx.f * Stmp3.f;
-	Sv12.f = __fsub_rn(Stmp1.f, Sv21.f);
-	Sv23.f = __fsub_rn(Stmp2.f, Sv32.f);
-	Sv31.f = __fsub_rn(Stmp3.f, Sv13.f);
-	Sv21.f = __fadd_rn(Stmp1.f, Sv21.f);
-	Sv32.f = __fadd_rn(Stmp2.f, Sv32.f);
-	Sv13.f = __fadd_rn(Stmp3.f, Sv13.f);
-
-	///###########################################################
-	// Multiply (from the right) with V
-	//###########################################################
-
-	Stmp2.f = Sa12.f;
-	Stmp3.f = Sa13.f;
-	Sa12.f = Sv12.f * Sa11.f;
-	Sa13.f = Sv13.f * Sa11.f;
-	Sa11.f = Sv11.f * Sa11.f;
-	Stmp1.f = Sv21.f * Stmp2.f;
-	Sa11.f = __fadd_rn(Sa11.f, Stmp1.f);
-	Stmp1.f = Sv31.f * Stmp3.f;
-	Sa11.f = __fadd_rn(Sa11.f, Stmp1.f);
-	Stmp1.f = Sv22.f * Stmp2.f;
-	Sa12.f = __fadd_rn(Sa12.f, Stmp1.f);
-	Stmp1.f = Sv32.f * Stmp3.f;
-	Sa12.f = __fadd_rn(Sa12.f, Stmp1.f);
-	Stmp1.f = Sv23.f * Stmp2.f;
-	Sa13.f = __fadd_rn(Sa13.f, Stmp1.f);
-	Stmp1.f = Sv33.f * Stmp3.f;
-	Sa13.f = __fadd_rn(Sa13.f, Stmp1.f);
-
-	Stmp2.f = Sa22.f;
-	Stmp3.f = Sa23.f;
-	Sa22.f = Sv12.f * Sa21.f;
-	Sa23.f = Sv13.f * Sa21.f;
-	Sa21.f = Sv11.f * Sa21.f;
-	Stmp1.f = Sv21.f * Stmp2.f;
-	Sa21.f = __fadd_rn(Sa21.f, Stmp1.f);
-	Stmp1.f = Sv31.f * Stmp3.f;
-	Sa21.f = __fadd_rn(Sa21.f, Stmp1.f);
-	Stmp1.f = Sv22.f * Stmp2.f;
-	Sa22.f = __fadd_rn(Sa22.f, Stmp1.f);
-	Stmp1.f = Sv32.f * Stmp3.f;
-	Sa22.f = __fadd_rn(Sa22.f, Stmp1.f);
-	Stmp1.f = Sv23.f * Stmp2.f;
-	Sa23.f = __fadd_rn(Sa23.f, Stmp1.f);
-	Stmp1.f = Sv33.f * Stmp3.f;
-	Sa23.f = __fadd_rn(Sa23.f, Stmp1.f);
-
-	Stmp2.f = Sa32.f;
-	Stmp3.f = Sa33.f;
-	Sa32.f = Sv12.f * Sa31.f;
-	Sa33.f = Sv13.f * Sa31.f;
-	Sa31.f = Sv11.f * Sa31.f;
-	Stmp1.f = Sv21.f * Stmp2.f;
-	Sa31.f = __fadd_rn(Sa31.f, Stmp1.f);
-	Stmp1.f = Sv31.f * Stmp3.f;
-	Sa31.f = __fadd_rn(Sa31.f, Stmp1.f);
-	Stmp1.f = Sv22.f * Stmp2.f;
-	Sa32.f = __fadd_rn(Sa32.f, Stmp1.f);
-	Stmp1.f = Sv32.f * Stmp3.f;
-	Sa32.f = __fadd_rn(Sa32.f, Stmp1.f);
-	Stmp1.f = Sv23.f * Stmp2.f;
-	Sa33.f = __fadd_rn(Sa33.f, Stmp1.f);
-	Stmp1.f = Sv33.f * Stmp3.f;
-	Sa33.f = __fadd_rn(Sa33.f, Stmp1.f);
-
-	//###########################################################
-	// Permute columns such that the singular values are sorted
-	//###########################################################
-
-	Stmp1.f = Sa11.f * Sa11.f;
-	Stmp4.f = Sa21.f * Sa21.f;
-	Stmp1.f = __fadd_rn(Stmp1.f, Stmp4.f);
-	Stmp4.f = Sa31.f * Sa31.f;
-	Stmp1.f = __fadd_rn(Stmp1.f, Stmp4.f);
-
-	Stmp2.f = Sa12.f * Sa12.f;
-	Stmp4.f = Sa22.f * Sa22.f;
-	Stmp2.f = __fadd_rn(Stmp2.f, Stmp4.f);
-	Stmp4.f = Sa32.f * Sa32.f;
-	Stmp2.f = __fadd_rn(Stmp2.f, Stmp4.f);
-
-	Stmp3.f = Sa13.f * Sa13.f;
-	Stmp4.f = Sa23.f * Sa23.f;
-	Stmp3.f = __fadd_rn(Stmp3.f, Stmp4.f);
-	Stmp4.f = Sa33.f * Sa33.f;
-	Stmp3.f = __fadd_rn(Stmp3.f, Stmp4.f);
-
-	// Swap columns 1-2 if necessary
-
-	Stmp4.ui = (Stmp1.f < Stmp2.f) ? 0xffffffff : 0;
-	Stmp5.ui = Sa11.ui ^ Sa12.ui;
-	Stmp5.ui = Stmp5.ui & Stmp4.ui;
-	Sa11.ui = Sa11.ui ^ Stmp5.ui;
-	Sa12.ui = Sa12.ui ^ Stmp5.ui;
-
-	Stmp5.ui = Sa21.ui ^ Sa22.ui;
-	Stmp5.ui = Stmp5.ui & Stmp4.ui;
-	Sa21.ui = Sa21.ui ^ Stmp5.ui;
-	Sa22.ui = Sa22.ui ^ Stmp5.ui;
-
-	Stmp5.ui = Sa31.ui ^ Sa32.ui;
-	Stmp5.ui = Stmp5.ui & Stmp4.ui;
-	Sa31.ui = Sa31.ui ^ Stmp5.ui;
-	Sa32.ui = Sa32.ui ^ Stmp5.ui;
-
-	Stmp5.ui = Sv11.ui ^ Sv12.ui;
-	Stmp5.ui = Stmp5.ui & Stmp4.ui;
-	Sv11.ui = Sv11.ui ^ Stmp5.ui;
-	Sv12.ui = Sv12.ui ^ Stmp5.ui;
-
-	Stmp5.ui = Sv21.ui ^ Sv22.ui;
-	Stmp5.ui = Stmp5.ui & Stmp4.ui;
-	Sv21.ui = Sv21.ui ^ Stmp5.ui;
-	Sv22.ui = Sv22.ui ^ Stmp5.ui;
-
-	Stmp5.ui = Sv31.ui ^ Sv32.ui;
-	Stmp5.ui = Stmp5.ui & Stmp4.ui;
-	Sv31.ui = Sv31.ui ^ Stmp5.ui;
-	Sv32.ui = Sv32.ui ^ Stmp5.ui;
-
-	Stmp5.ui = Stmp1.ui ^ Stmp2.ui;
-	Stmp5.ui = Stmp5.ui & Stmp4.ui;
-	Stmp1.ui = Stmp1.ui ^ Stmp5.ui;
-	Stmp2.ui = Stmp2.ui ^ Stmp5.ui;
-
-	// If columns 1-2 have been swapped, negate 2nd column of A and V so that V is still a rotation
-
-	Stmp5.f = -2.f;
-	Stmp5.ui = Stmp5.ui & Stmp4.ui;
-	Stmp4.f = 1.f;
-	Stmp4.f = __fadd_rn(Stmp4.f, Stmp5.f);
-
-	Sa12.f = Sa12.f * Stmp4.f;
-	Sa22.f = Sa22.f * Stmp4.f;
-	Sa32.f = Sa32.f * Stmp4.f;
-
-	Sv12.f = Sv12.f * Stmp4.f;
-	Sv22.f = Sv22.f * Stmp4.f;
-	Sv32.f = Sv32.f * Stmp4.f;
-
-	// Swap columns 1-3 if necessary
-
-	Stmp4.ui = (Stmp1.f < Stmp3.f) ? 0xffffffff : 0;
-	Stmp5.ui = Sa11.ui ^ Sa13.ui;
-	Stmp5.ui = Stmp5.ui & Stmp4.ui;
-	Sa11.ui = Sa11.ui ^ Stmp5.ui;
-	Sa13.ui = Sa13.ui ^ Stmp5.ui;
-
-	Stmp5.ui = Sa21.ui ^ Sa23.ui;
-	Stmp5.ui = Stmp5.ui & Stmp4.ui;
-	Sa21.ui = Sa21.ui ^ Stmp5.ui;
-	Sa23.ui = Sa23.ui ^ Stmp5.ui;
-
-	Stmp5.ui = Sa31.ui ^ Sa33.ui;
-	Stmp5.ui = Stmp5.ui & Stmp4.ui;
-	Sa31.ui = Sa31.ui ^ Stmp5.ui;
-	Sa33.ui = Sa33.ui ^ Stmp5.ui;
-
-	Stmp5.ui = Sv11.ui ^ Sv13.ui;
-	Stmp5.ui = Stmp5.ui & Stmp4.ui;
-	Sv11.ui = Sv11.ui ^ Stmp5.ui;
-	Sv13.ui = Sv13.ui ^ Stmp5.ui;
-
-	Stmp5.ui = Sv21.ui ^ Sv23.ui;
-	Stmp5.ui = Stmp5.ui & Stmp4.ui;
-	Sv21.ui = Sv21.ui ^ Stmp5.ui;
-	Sv23.ui = Sv23.ui ^ Stmp5.ui;
-
-	Stmp5.ui = Sv31.ui ^ Sv33.ui;
-	Stmp5.ui = Stmp5.ui & Stmp4.ui;
-	Sv31.ui = Sv31.ui ^ Stmp5.ui;
-	Sv33.ui = Sv33.ui ^ Stmp5.ui;
-
-	Stmp5.ui = Stmp1.ui ^ Stmp3.ui;
-	Stmp5.ui = Stmp5.ui & Stmp4.ui;
-	Stmp1.ui = Stmp1.ui ^ Stmp5.ui;
-	Stmp3.ui = Stmp3.ui ^ Stmp5.ui;
-
-	// If columns 1-3 have been swapped, negate 1st column of A and V so that V is still a rotation
-
-	Stmp5.f = -2.f;
-	Stmp5.ui = Stmp5.ui & Stmp4.ui;
-	Stmp4.f = 1.f;
-	Stmp4.f = __fadd_rn(Stmp4.f, Stmp5.f);
-
-	Sa11.f = Sa11.f * Stmp4.f;
-	Sa21.f = Sa21.f * Stmp4.f;
-	Sa31.f = Sa31.f * Stmp4.f;
-
-	Sv11.f = Sv11.f * Stmp4.f;
-	Sv21.f = Sv21.f * Stmp4.f;
-	Sv31.f = Sv31.f * Stmp4.f;
-
-	// Swap columns 2-3 if necessary
-
-	Stmp4.ui = (Stmp2.f < Stmp3.f) ? 0xffffffff : 0;
-	Stmp5.ui = Sa12.ui ^ Sa13.ui;
-	Stmp5.ui = Stmp5.ui & Stmp4.ui;
-	Sa12.ui = Sa12.ui ^ Stmp5.ui;
-	Sa13.ui = Sa13.ui ^ Stmp5.ui;
-
-	Stmp5.ui = Sa22.ui ^ Sa23.ui;
-	Stmp5.ui = Stmp5.ui & Stmp4.ui;
-	Sa22.ui = Sa22.ui ^ Stmp5.ui;
-	Sa23.ui = Sa23.ui ^ Stmp5.ui;
-
-	Stmp5.ui = Sa32.ui ^ Sa33.ui;
-	Stmp5.ui = Stmp5.ui & Stmp4.ui;
-	Sa32.ui = Sa32.ui ^ Stmp5.ui;
-	Sa33.ui = Sa33.ui ^ Stmp5.ui;
-
-	Stmp5.ui = Sv12.ui ^ Sv13.ui;
-	Stmp5.ui = Stmp5.ui & Stmp4.ui;
-	Sv12.ui = Sv12.ui ^ Stmp5.ui;
-	Sv13.ui = Sv13.ui ^ Stmp5.ui;
-
-	Stmp5.ui = Sv22.ui ^ Sv23.ui;
-	Stmp5.ui = Stmp5.ui & Stmp4.ui;
-	Sv22.ui = Sv22.ui ^ Stmp5.ui;
-	Sv23.ui = Sv23.ui ^ Stmp5.ui;
-
-	Stmp5.ui = Sv32.ui ^ Sv33.ui;
-	Stmp5.ui = Stmp5.ui & Stmp4.ui;
-	Sv32.ui = Sv32.ui ^ Stmp5.ui;
-	Sv33.ui = Sv33.ui ^ Stmp5.ui;
-
-	Stmp5.ui = Stmp2.ui ^ Stmp3.ui;
-	Stmp5.ui = Stmp5.ui & Stmp4.ui;
-	Stmp2.ui = Stmp2.ui ^ Stmp5.ui;
-	Stmp3.ui = Stmp3.ui ^ Stmp5.ui;
-
-	// If columns 2-3 have been swapped, negate 3rd column of A and V so that V is still a rotation
-
-	Stmp5.f = -2.f;
-	Stmp5.ui = Stmp5.ui & Stmp4.ui;
-	Stmp4.f = 1.f;
-	Stmp4.f = __fadd_rn(Stmp4.f, Stmp5.f);
-
-	Sa13.f = Sa13.f * Stmp4.f;
-	Sa23.f = Sa23.f * Stmp4.f;
-	Sa33.f = Sa33.f * Stmp4.f;
-
-	Sv13.f = Sv13.f * Stmp4.f;
-	Sv23.f = Sv23.f * Stmp4.f;
-	Sv33.f = Sv33.f * Stmp4.f;
-
-	//###########################################################
-	// Construct QR factorization of A*V (=U*D) using Givens rotations
-	//###########################################################
-
-	Su11.f = 1.f;
-	Su12.f = 0.f;
-	Su13.f = 0.f;
-	Su21.f = 0.f;
-	Su22.f = 1.f;
-	Su23.f = 0.f;
-	Su31.f = 0.f;
-	Su32.f = 0.f;
-	Su33.f = 1.f;
-
-	Ssh.f = Sa21.f * Sa21.f;
-	Ssh.ui = (Ssh.f >= gsmall_number) ? 0xffffffff : 0;
-	Ssh.ui = Ssh.ui & Sa21.ui;
-
-	Stmp5.f = 0.f;
-	Sch.f = __fsub_rn(Stmp5.f, Sa11.f);
-	Sch.f = max(Sch.f, Sa11.f);
-	Sch.f = max(Sch.f, gsmall_number);
-	Stmp5.ui = (Sa11.f >= Stmp5.f) ? 0xffffffff : 0;
-
-	Stmp1.f = Sch.f * Sch.f;
-	Stmp2.f = Ssh.f * Ssh.f;
-	Stmp2.f = __fadd_rn(Stmp1.f, Stmp2.f);
-	Stmp1.f = __frsqrt_rn(Stmp2.f);
-
-	Stmp4.f = Stmp1.f * 0.5f;
-	Stmp3.f = Stmp1.f * Stmp4.f;
-	Stmp3.f = Stmp1.f * Stmp3.f;
-	Stmp3.f = Stmp2.f * Stmp3.f;
-	Stmp1.f = __fadd_rn(Stmp1.f, Stmp4.f);
-	Stmp1.f = __fsub_rn(Stmp1.f, Stmp3.f);
-	Stmp1.f = Stmp1.f * Stmp2.f;
-
-	Sch.f = __fadd_rn(Sch.f, Stmp1.f);
-
-	Stmp1.ui = ~Stmp5.ui & Ssh.ui;
-	Stmp2.ui = ~Stmp5.ui & Sch.ui;
-	Sch.ui = Stmp5.ui & Sch.ui;
-	Ssh.ui = Stmp5.ui & Ssh.ui;
-	Sch.ui = Sch.ui | Stmp1.ui;
-	Ssh.ui = Ssh.ui | Stmp2.ui;
-
-	Stmp1.f = Sch.f * Sch.f;
-	Stmp2.f = Ssh.f * Ssh.f;
-	Stmp2.f = __fadd_rn(Stmp1.f, Stmp2.f);
-	Stmp1.f = __frsqrt_rn(Stmp2.f);
-
-	Stmp4.f = Stmp1.f * 0.5f;
-	Stmp3.f = Stmp1.f * Stmp4.f;
-	Stmp3.f = Stmp1.f * Stmp3.f;
-	Stmp3.f = Stmp2.f * Stmp3.f;
-	Stmp1.f = __fadd_rn(Stmp1.f, Stmp4.f);
-	Stmp1.f = __fsub_rn(Stmp1.f, Stmp3.f);
-
-	Sch.f = Sch.f * Stmp1.f;
-	Ssh.f = Ssh.f * Stmp1.f;
-
-	Sc.f = Sch.f * Sch.f;
-	Ss.f = Ssh.f * Ssh.f;
-	Sc.f = __fsub_rn(Sc.f, Ss.f);
-	Ss.f = Ssh.f * Sch.f;
-	Ss.f = __fadd_rn(Ss.f, Ss.f);
-
-	//###########################################################
-	// Rotate matrix A
-	//###########################################################
-
-	Stmp1.f = Ss.f * Sa11.f;
-	Stmp2.f = Ss.f * Sa21.f;
-	Sa11.f = Sc.f * Sa11.f;
-	Sa21.f = Sc.f * Sa21.f;
-	Sa11.f = __fadd_rn(Sa11.f, Stmp2.f);
-	Sa21.f = __fsub_rn(Sa21.f, Stmp1.f);
-
-	Stmp1.f = Ss.f * Sa12.f;
-	Stmp2.f = Ss.f * Sa22.f;
-	Sa12.f = Sc.f * Sa12.f;
-	Sa22.f = Sc.f * Sa22.f;
-	Sa12.f = __fadd_rn(Sa12.f, Stmp2.f);
-	Sa22.f = __fsub_rn(Sa22.f, Stmp1.f);
-
-	Stmp1.f = Ss.f * Sa13.f;
-	Stmp2.f = Ss.f * Sa23.f;
-	Sa13.f = Sc.f * Sa13.f;
-	Sa23.f = Sc.f * Sa23.f;
-	Sa13.f = __fadd_rn(Sa13.f, Stmp2.f);
-	Sa23.f = __fsub_rn(Sa23.f, Stmp1.f);
-
-	//###########################################################
-	// Update matrix U
-	//###########################################################
-
-	Stmp1.f = Ss.f * Su11.f;
-	Stmp2.f = Ss.f * Su12.f;
-	Su11.f = Sc.f * Su11.f;
-	Su12.f = Sc.f * Su12.f;
-	Su11.f = __fadd_rn(Su11.f, Stmp2.f);
-	Su12.f = __fsub_rn(Su12.f, Stmp1.f);
-
-	Stmp1.f = Ss.f * Su21.f;
-	Stmp2.f = Ss.f * Su22.f;
-	Su21.f = Sc.f * Su21.f;
-	Su22.f = Sc.f * Su22.f;
-	Su21.f = __fadd_rn(Su21.f, Stmp2.f);
-	Su22.f = __fsub_rn(Su22.f, Stmp1.f);
-
-	Stmp1.f = Ss.f * Su31.f;
-	Stmp2.f = Ss.f * Su32.f;
-	Su31.f = Sc.f * Su31.f;
-	Su32.f = Sc.f * Su32.f;
-	Su31.f = __fadd_rn(Su31.f, Stmp2.f);
-	Su32.f = __fsub_rn(Su32.f, Stmp1.f);
-
-	// Second Givens rotation
-
-	Ssh.f = Sa31.f * Sa31.f;
-	Ssh.ui = (Ssh.f >= gsmall_number) ? 0xffffffff : 0;
-	Ssh.ui = Ssh.ui & Sa31.ui;
-
-	Stmp5.f = 0.f;
-	Sch.f = __fsub_rn(Stmp5.f, Sa11.f);
-	Sch.f = max(Sch.f, Sa11.f);
-	Sch.f = max(Sch.f, gsmall_number);
-	Stmp5.ui = (Sa11.f >= Stmp5.f) ? 0xffffffff : 0;
-
-	Stmp1.f = Sch.f * Sch.f;
-	Stmp2.f = Ssh.f * Ssh.f;
-	Stmp2.f = __fadd_rn(Stmp1.f, Stmp2.f);
-	Stmp1.f = __frsqrt_rn(Stmp2.f);
-
-	Stmp4.f = Stmp1.f * 0.5;
-	Stmp3.f = Stmp1.f * Stmp4.f;
-	Stmp3.f = Stmp1.f * Stmp3.f;
-	Stmp3.f = Stmp2.f * Stmp3.f;
-	Stmp1.f = __fadd_rn(Stmp1.f, Stmp4.f);
-	Stmp1.f = __fsub_rn(Stmp1.f, Stmp3.f);
-	Stmp1.f = Stmp1.f * Stmp2.f;
-
-	Sch.f = __fadd_rn(Sch.f, Stmp1.f);
-
-	Stmp1.ui = ~Stmp5.ui & Ssh.ui;
-	Stmp2.ui = ~Stmp5.ui & Sch.ui;
-	Sch.ui = Stmp5.ui & Sch.ui;
-	Ssh.ui = Stmp5.ui & Ssh.ui;
-	Sch.ui = Sch.ui | Stmp1.ui;
-	Ssh.ui = Ssh.ui | Stmp2.ui;
-
-	Stmp1.f = Sch.f * Sch.f;
-	Stmp2.f = Ssh.f * Ssh.f;
-	Stmp2.f = __fadd_rn(Stmp1.f, Stmp2.f);
-	Stmp1.f = __frsqrt_rn(Stmp2.f);
-
-	Stmp4.f = Stmp1.f * 0.5f;
-	Stmp3.f = Stmp1.f * Stmp4.f;
-	Stmp3.f = Stmp1.f * Stmp3.f;
-	Stmp3.f = Stmp2.f * Stmp3.f;
-	Stmp1.f = __fadd_rn(Stmp1.f, Stmp4.f);
-	Stmp1.f = __fsub_rn(Stmp1.f, Stmp3.f);
-
-	Sch.f = Sch.f * Stmp1.f;
-	Ssh.f = Ssh.f * Stmp1.f;
-
-	Sc.f = Sch.f * Sch.f;
-	Ss.f = Ssh.f * Ssh.f;
-	Sc.f = __fsub_rn(Sc.f, Ss.f);
-	Ss.f = Ssh.f * Sch.f;
-	Ss.f = __fadd_rn(Ss.f, Ss.f);
-
-	//###########################################################
-	// Rotate matrix A
-	//###########################################################
-
-	Stmp1.f = Ss.f * Sa11.f;
-	Stmp2.f = Ss.f * Sa31.f;
-	Sa11.f = Sc.f * Sa11.f;
-	Sa31.f = Sc.f * Sa31.f;
-	Sa11.f = __fadd_rn(Sa11.f, Stmp2.f);
-	Sa31.f = __fsub_rn(Sa31.f, Stmp1.f);
-
-	Stmp1.f = Ss.f * Sa12.f;
-	Stmp2.f = Ss.f * Sa32.f;
-	Sa12.f = Sc.f * Sa12.f;
-	Sa32.f = Sc.f * Sa32.f;
-	Sa12.f = __fadd_rn(Sa12.f, Stmp2.f);
-	Sa32.f = __fsub_rn(Sa32.f, Stmp1.f);
-
-	Stmp1.f = Ss.f * Sa13.f;
-	Stmp2.f = Ss.f * Sa33.f;
-	Sa13.f = Sc.f * Sa13.f;
-	Sa33.f = Sc.f * Sa33.f;
-	Sa13.f = __fadd_rn(Sa13.f, Stmp2.f);
-	Sa33.f = __fsub_rn(Sa33.f, Stmp1.f);
-
-	//###########################################################
-	// Update matrix U
-	//###########################################################
-
-	Stmp1.f = Ss.f * Su11.f;
-	Stmp2.f = Ss.f * Su13.f;
-	Su11.f = Sc.f * Su11.f;
-	Su13.f = Sc.f * Su13.f;
-	Su11.f = __fadd_rn(Su11.f, Stmp2.f);
-	Su13.f = __fsub_rn(Su13.f, Stmp1.f);
-
-	Stmp1.f = Ss.f * Su21.f;
-	Stmp2.f = Ss.f * Su23.f;
-	Su21.f = Sc.f * Su21.f;
-	Su23.f = Sc.f * Su23.f;
-	Su21.f = __fadd_rn(Su21.f, Stmp2.f);
-	Su23.f = __fsub_rn(Su23.f, Stmp1.f);
-
-	Stmp1.f = Ss.f * Su31.f;
-	Stmp2.f = Ss.f * Su33.f;
-	Su31.f = Sc.f * Su31.f;
-	Su33.f = Sc.f * Su33.f;
-	Su31.f = __fadd_rn(Su31.f, Stmp2.f);
-	Su33.f = __fsub_rn(Su33.f, Stmp1.f);
-
-	// Third Givens Rotation
-
-	Ssh.f = Sa32.f * Sa32.f;
-	Ssh.ui = (Ssh.f >= gsmall_number) ? 0xffffffff : 0;
-	Ssh.ui = Ssh.ui & Sa32.ui;
-
-	Stmp5.f = 0.f;
-	Sch.f = __fsub_rn(Stmp5.f, Sa22.f);
-	Sch.f = max(Sch.f, Sa22.f);
-	Sch.f = max(Sch.f, gsmall_number);
-	Stmp5.ui = (Sa22.f >= Stmp5.f) ? 0xffffffff : 0;
-
-	Stmp1.f = Sch.f * Sch.f;
-	Stmp2.f = Ssh.f * Ssh.f;
-	Stmp2.f = __fadd_rn(Stmp1.f, Stmp2.f);
-	Stmp1.f = __frsqrt_rn(Stmp2.f);
-
-	Stmp4.f = Stmp1.f * 0.5f;
-	Stmp3.f = Stmp1.f * Stmp4.f;
-	Stmp3.f = Stmp1.f * Stmp3.f;
-	Stmp3.f = Stmp2.f * Stmp3.f;
-	Stmp1.f = __fadd_rn(Stmp1.f, Stmp4.f);
-	Stmp1.f = __fsub_rn(Stmp1.f, Stmp3.f);
-	Stmp1.f = Stmp1.f * Stmp2.f;
-
-	Sch.f = __fadd_rn(Sch.f, Stmp1.f);
-
-	Stmp1.ui = ~Stmp5.ui & Ssh.ui;
-	Stmp2.ui = ~Stmp5.ui & Sch.ui;
-	Sch.ui = Stmp5.ui & Sch.ui;
-	Ssh.ui = Stmp5.ui & Ssh.ui;
-	Sch.ui = Sch.ui | Stmp1.ui;
-	Ssh.ui = Ssh.ui | Stmp2.ui;
-
-	Stmp1.f = Sch.f * Sch.f;
-	Stmp2.f = Ssh.f * Ssh.f;
-	Stmp2.f = __fadd_rn(Stmp1.f, Stmp2.f);
-	Stmp1.f = __frsqrt_rn(Stmp2.f);
-
-	Stmp4.f = Stmp1.f * 0.5f;
-	Stmp3.f = Stmp1.f * Stmp4.f;
-	Stmp3.f = Stmp1.f * Stmp3.f;
-	Stmp3.f = Stmp2.f * Stmp3.f;
-	Stmp1.f = __fadd_rn(Stmp1.f, Stmp4.f);
-	Stmp1.f = __fsub_rn(Stmp1.f, Stmp3.f);
-
-	Sch.f = Sch.f * Stmp1.f;
-	Ssh.f = Ssh.f * Stmp1.f;
-
-	Sc.f = Sch.f * Sch.f;
-	Ss.f = Ssh.f * Ssh.f;
-	Sc.f = __fsub_rn(Sc.f, Ss.f);
-	Ss.f = Ssh.f * Sch.f;
-	Ss.f = __fadd_rn(Ss.f, Ss.f);
-
-	//###########################################################
-	// Rotate matrix A
-	//###########################################################
-
-	Stmp1.f = Ss.f * Sa21.f;
-	Stmp2.f = Ss.f * Sa31.f;
-	Sa21.f = Sc.f * Sa21.f;
-	Sa31.f = Sc.f * Sa31.f;
-	Sa21.f = __fadd_rn(Sa21.f, Stmp2.f);
-	Sa31.f = __fsub_rn(Sa31.f, Stmp1.f);
-
-	Stmp1.f = Ss.f * Sa22.f;
-	Stmp2.f = Ss.f * Sa32.f;
-	Sa22.f = Sc.f * Sa22.f;
-	Sa32.f = Sc.f * Sa32.f;
-	Sa22.f = __fadd_rn(Sa22.f, Stmp2.f);
-	Sa32.f = __fsub_rn(Sa32.f, Stmp1.f);
-
-	Stmp1.f = Ss.f * Sa23.f;
-	Stmp2.f = Ss.f * Sa33.f;
-	Sa23.f = Sc.f * Sa23.f;
-	Sa33.f = Sc.f * Sa33.f;
-	Sa23.f = __fadd_rn(Sa23.f, Stmp2.f);
-	Sa33.f = __fsub_rn(Sa33.f, Stmp1.f);
-
-	//###########################################################
-	// Update matrix U
-	//###########################################################
-
-	Stmp1.f = Ss.f * Su12.f;
-	Stmp2.f = Ss.f * Su13.f;
-	Su12.f = Sc.f * Su12.f;
-	Su13.f = Sc.f * Su13.f;
-	Su12.f = __fadd_rn(Su12.f, Stmp2.f);
-	Su13.f = __fsub_rn(Su13.f, Stmp1.f);
-
-	Stmp1.f = Ss.f * Su22.f;
-	Stmp2.f = Ss.f * Su23.f;
-	Su22.f = Sc.f * Su22.f;
-	Su23.f = Sc.f * Su23.f;
-	Su22.f = __fadd_rn(Su22.f, Stmp2.f);
-	Su23.f = __fsub_rn(Su23.f, Stmp1.f);
-
-	Stmp1.f = Ss.f * Su32.f;
-	Stmp2.f = Ss.f * Su33.f;
-	Su32.f = Sc.f * Su32.f;
-	Su33.f = Sc.f * Su33.f;
-	Su32.f = __fadd_rn(Su32.f, Stmp2.f);
-	Su33.f = __fsub_rn(Su33.f, Stmp1.f);
-
-	v11 = Sv11.f;
-	v12 = Sv12.f;
-	v13 = Sv13.f;
-	v21 = Sv21.f;
-	v22 = Sv22.f;
-	v23 = Sv23.f;
-	v31 = Sv31.f;
-	v32 = Sv32.f;
-	v33 = Sv33.f;
-
-	u11 = Su11.f;
-	u12 = Su12.f;
-	u13 = Su13.f;
-	u21 = Su21.f;
-	u22 = Su22.f;
-	u23 = Su23.f;
-	u31 = Su31.f;
-	u32 = Su32.f;
-	u33 = Su33.f;
-
-	s11 = Sa11.f;
-	//s12 = Sa12.f; s13 = Sa13.f; s21 = Sa21.f;
-	s22 = Sa22.f;
-	//s23 = Sa23.f; s31 = Sa31.f; s32 = Sa32.f;
-	s33 = Sa33.f;
-}
-
-/**
+	/**
    \brief 2x2 SVD (singular value decomposition) A=USV'
    \param[in] A Input matrix.
-   \param[out] U Robustly a rotation matrix in Givens form
-   \param[out] Sigma Vector of singular values sorted with decreasing magnitude. The second one can be negative.
+   \param[out] u Robustly a rotation matrix in Givens form
+   \param[out] sigma Vector of singular values sorted with decreasing magnitude. The second one can be negative.
    \param[out] V Robustly a rotation matrix in Givens form
 */
-template <typename T>
-__forceinline__ __host__ __device__ 
-void singularValueDecomposition(const T AA[4], GivensRotation<double>& U, T Sigma[2], GivensRotation<double>& V) {
-    double S_Sym[4];	///< column-major
-	double A[4]{AA[0], AA[1], AA[2], AA[3]};
-    polarDecomposition(A, U, S_Sym);
-    double cosine, sine;
-    double x = S_Sym[0];
-    double y = S_Sym[2];
-    double z = S_Sym[3];
-    double y2 = y * y;
-    if (y2 == 0) {
-        // S is already diagonal
-        cosine = 1;
-        sine = 0;
-        Sigma[0] = x;
-        Sigma[1] = z;
-    }
-    else {
-        double tau = T(0.5) * (x - z);
-        double w = sqrt(tau * tau + y2);
-        // w > y > 0
-        double t;
-        if (tau > 0) {
-            // tau + w > w > y > 0 ==> division is safe
-            t = y / (tau + w);
-        }
-        else {
-            // tau - w < -w < -y < 0 ==> division is safe
-            t = y / (tau - w);
-        }
-        cosine = T(1) / sqrt(t * t + T(1));
-        sine = -t * cosine;
-        /*
-          V = [cosine -sine; sine cosine]
-          Sigma = V'SV. Only compute the diagonals for efficiency.
-          Also utilize symmetry of S and don't form V yet.
+	template<typename T>
+	__forceinline__ __host__ __device__ void singular_value_decomposition(const std::array<T, 4>& aa, GivensRotation<double>& u, std::array<T, 2>& sigma, GivensRotation<double>& v) {
+		std::array<double, 4> s_sym;///< column-major
+		std::array<double, 4> a {aa[0], aa[1], aa[2], aa[3]};
+		polar_decomposition(a, u, s_sym);
+		double cosine;
+		double sine;
+		double x  = s_sym[0];
+		double y  = s_sym[2];
+		double z  = s_sym[3];
+		double y2 = y * y;
+		if(y2 == 0) {
+			// S is already diagonal
+			cosine	 = 1;
+			sine	 = 0;
+			sigma[0] = x;
+			sigma[1] = z;
+		} else {
+			double tau = T(0.5) * (x - z);
+			double w   = sqrt(tau * tau + y2);
+			// w > y > 0
+			double t;
+			if(tau > 0) {
+				// tau + w > w > y > 0 ==> division is safe
+				t = y / (tau + w);
+			} else {
+				// tau - w < -w < -y < 0 ==> division is safe
+				t = y / (tau - w);
+			}
+			cosine = T(1) / sqrt(t * t + T(1));
+			sine   = -t * cosine;
+			/*
+          v = [cosine -sine; sine cosine]
+          sigma = v'SV. Only compute the diagonals for efficiency.
+          Also utilize symmetry of S and don't form v yet.
         */
-        double c2 = cosine * cosine;
-        double csy = 2 * cosine * sine * y;
-        double s2 = sine * sine;
-        Sigma[0] = c2 * x - csy + s2 * z;
-        Sigma[1] = s2 * x + csy + c2 * z;
-    }
+			double c2  = cosine * cosine;
+			double csy = 2 * cosine * sine * y;
+			double s2  = sine * sine;
+			sigma[0]   = c2 * x - csy + s2 * z;
+			sigma[1]   = s2 * x + csy + c2 * z;
+		}
 
-    // Sorting
-    // Polar already guarantees negative sign is on the small magnitude singular value.
-    if (Sigma[0] < Sigma[1]) {
-        swap(Sigma, Sigma + 1);
-        V.c = -sine;
-        V.s = cosine;
-    }
-    else {
-        V.c = cosine;
-        V.s = sine;
-    }
-    U *= V;
-}
+		// Sorting
+		// Polar already guarantees negative sign is on the small magnitude singular value.
+		if(sigma[0] < sigma[1]) {
+			std::swap(sigma[0], sigma[1]);
+			v.c = -sine;
+			v.s = cosine;
+		} else {
+			v.c = cosine;
+			v.s = sine;
+		}
+		u *= v;
+	}
 
-template<typename T, unsigned int Dim>
-__forceinline__ __device__ void svd(const T F[Dim*Dim], T U[Dim*Dim],
-	T S[Dim], T V[Dim*Dim]) {
-	printf("Not implemented yet!\n");
-}
+	template<typename T, unsigned int Dim>
+	__forceinline__ __device__ void svd(const std::array<T, Dim * Dim>& f, std::array<T, Dim * Dim>& u, std::array<T, Dim>& s, std::array<T, Dim * Dim>& v) {
+		printf("Not implemented yet!\n");
+	}
 
-/**
-   \brief 2x2 SVD (singular value decomposition) A=USV'
-   \param[in] A Input matrix.
-   \param[out] U Robustly a rotation matrix.
-   \param[out] Sigma Vector of singular values sorted with decreasing magnitude. The second one can be negative.
-   \param[out] V Robustly a rotation matrix.
+	/**
+   \brief 2x2 SVD (singular value decomposition) a=USV'
+   \param[in] a Input matrix.
+   \param[out] u Robustly a rotation matrix.
+   \param[out] sigma Vector of singular values sorted with decreasing magnitude. The second one can be negative.
+   \param[out] v Robustly a rotation matrix.
 */
-template <>
-__forceinline__ __device__ 
-void svd<float, 2>(const float A[4], float U[4], float Sigma[2], float V[4])
-{
-    GivensRotation<double> gv(0, 1);
-    GivensRotation<double> gu(0, 1);
-    singularValueDecomposition(A, gu, Sigma, gv);
+	template<>
+	__forceinline__ __device__ void svd<float, 2>(const std::array<float, 4>& a, std::array<float, 4>& u, std::array<float, 2>& sigma, std::array<float, 4>& v) {
+		GivensRotation<double> gv(0, 1);
+		GivensRotation<double> gu(0, 1);
+		singular_value_decomposition(a, gu, sigma, gv);
 
-    gu.template fill<2, float>(U);
-    gv.template fill<2, float>(V);
-}
+		gu.template fill<2, float>(u);
+		gv.template fill<2, float>(v);
+	}
 
-template <>
-__forceinline__ __device__ 
-void svd<double, 2>(const double A[4], double U[4], double Sigma[2], double V[4])
-{
-    GivensRotation<double> gv(0, 1);
-    GivensRotation<double> gu(0, 1);
-    singularValueDecomposition(A, gu, Sigma, gv);
+	template<>
+	__forceinline__ __device__ void svd<double, 2>(const std::array<double, 4>& a, std::array<double, 4>& u, std::array<double, 2>& sigma, std::array<double, 4>& v) {
+		GivensRotation<double> gv(0, 1);
+		GivensRotation<double> gu(0, 1);
+		singular_value_decomposition(a, gu, sigma, gv);
 
-    gu.template fill<2, double>(U);
-    gv.template fill<2, double>(V);
-}
+		gu.template fill<2, double>(u);
+		gv.template fill<2, double>(v);
+	}
 
-template<>
-__forceinline__ __device__ void svd<float, 3>(const float F[9], float U[9],
-	float S[3], float V[9]) {
-    svd(F[0], F[3], F[6], F[1], F[4], F[7], F[2], F[5], F[8], U[0], U[3], U[6], U[1], U[4], U[7], U[2], U[5], U[8], S[0], S[1], S[2], V[0], V[3], V[6], V[1], V[4], V[7], V[2], V[5], V[8]);
-}
+	template<>
+	__forceinline__ __device__ void svd<float, 3>(const std::array<float, 9>& f, std::array<float, 9>& u, std::array<float, 3>& s, std::array<float, 9>& v) {
+		svd(f[0], f[3], f[6], f[1], f[4], f[7], f[2], f[5], f[8], u[0], u[3], u[6], u[1], u[4], u[7], u[2], u[5], u[8], s[0], s[1], s[2], v[0], v[3], v[6], v[1], v[4], v[7], v[2], v[5], v[8]);
+	}
 
-template<>
-__forceinline__ __device__ void svd<double, 3>(const double F[9], double U[9],
-	double S[3], double V[9]) {
-    svd(F[0], F[3], F[6], F[1], F[4], F[7], F[2], F[5], F[8], U[0], U[3], U[6], U[1], U[4], U[7], U[2], U[5], U[8], S[0], S[1], S[2], V[0], V[3], V[6], V[1], V[4], V[7], V[2], V[5], V[8]);
-}
+	template<>
+	__forceinline__ __device__ void svd<double, 3>(const std::array<double, 9>& f, std::array<double, 9>& u, std::array<double, 3>& s, std::array<double, 9>& v) {
+		svd(f[0], f[3], f[6], f[1], f[4], f[7], f[2], f[5], f[8], u[0], u[3], u[6], u[1], u[4], u[7], u[2], u[5], u[8], s[0], s[1], s[2], v[0], v[3], v[6], v[1], v[4], v[7], v[2], v[5], v[8]);
+	}
 
-}	///< namespace math
+}// namespace math
 
-}	///< namespace mn
+}// namespace mn
 
 #endif

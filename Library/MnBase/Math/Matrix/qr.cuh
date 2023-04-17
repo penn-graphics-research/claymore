@@ -1,5 +1,5 @@
-#ifndef __QR_CUH_
-#define __QR_CUH_
+#ifndef QR_CUH
+#define QR_CUH
 #include "Givens.cuh"
 
 namespace mn {
@@ -18,24 +18,26 @@ namespace math {
 	 R is guaranteed to be the closest rotation to A.
 	 */
 	template<typename T>
-	__forceinline__ __host__ __device__ void polarDecomposition(const T A[4], GivensRotation<T>& R, T S[4]) {
-		double x[2] = { A[0] + A[3], A[1] - A[2] };
+	__forceinline__ __host__ __device__ void polar_decomposition(const std::array<T, 4>& a, GivensRotation<T>& r, std::array<T, 4>& s) {
+		double x[2]		   = {a[0] + a[3], a[1] - a[2]};
 		double denominator = sqrt(x[0] * x[0] + x[1] * x[1]);
-		R.c = (T)1, R.s = (T)0;
-		if (denominator != 0) {
-        /*
+		r.c				   = (T) 1;
+		r.s				   = (T) 0;
+		if(denominator != 0) {
+			/*
           No need to use a tolerance here because x(0) and x(1) always have
           smaller magnitude then denominator, therefore overflow never happens.
         */
-			R.c = x[0] / denominator;
-			R.s = -x[1] / denominator;
+			r.c = x[0] / denominator;
+			r.s = -x[1] / denominator;
 		}
-		for (int i = 0; i < 4; ++i)
-			S[i] = A[i];
-		R.template matRotation<2, T>(S);
+		for(int i = 0; i < 4; ++i) {
+			s[i] = a[i];
+		}
+		r.template mat_rotation<2, T>(s);
 	}
 
-/**
+	/**
    \brief 2x2 polar decomposition.
    \param[in] A matrix.
    \param[out] R Robustly a rotation matrix.
@@ -47,15 +49,14 @@ namespace math {
    R is guaranteed to be the closest rotation to A.
 */
 	template<typename T>
-	__forceinline__ __host__ __device__ void polarDecomposition(const T A[4], const T R[4], const T S[4])
-	{
-		GivensRotation<T> r(0, 1);
-		polarDecomposition(A, r, S);
-		r.fill<2>(R);
+	__forceinline__ __host__ __device__ void polar_decomposition(const std::array<T, 4>& a, const std::array<T, 4>& r, const std::array<T, 4>& s) {
+		GivensRotation<T> rotation(0, 1);
+		polar_decomposition(a, rotation, s);
+		rotation.fill<2>(R);
 	}
 
-	}
+}// namespace math
 
-}
+}// namespace mn
 
 #endif

@@ -1,63 +1,98 @@
-#ifndef __CUDA_EXECUTION_POLICY_H_
-#define __CUDA_EXECUTION_POLICY_H_
-#include <string>
+#ifndef CUDA_EXECUTION_POLICY_H
+#define CUDA_EXECUTION_POLICY_H
 #include <driver_types.h>
+
+#include <string>
 
 namespace mn {
 
 struct LaunchConfig {
-    template <typename IndexType0, typename IndexType1>
-    LaunchConfig(IndexType0 gs, IndexType1 bs)
-        : dg{ static_cast<unsigned int>(gs) }, db{ static_cast<unsigned int>(bs) }, shmem{ 0 }, sid{ cudaStreamDefault }
-    {
-    }
-    template <typename IndexType0, typename IndexType1, typename IndexType2>
-    LaunchConfig(IndexType0 gs, IndexType1 bs, IndexType2 mem)
-        : dg{ static_cast<unsigned int>(gs) }, db{ static_cast<unsigned int>(bs) }, shmem{ static_cast<std::size_t>(mem) }, sid{ cudaStreamDefault }
-    {
-    }
-    template <typename IndexType0, typename IndexType1, typename IndexType2>
-    LaunchConfig(IndexType0 gs, IndexType1 bs, IndexType2 mem, cudaStream_t stream)
-        : dg{ static_cast<unsigned int>(gs) }, db{ static_cast<unsigned int>(bs) }, shmem{ static_cast<std::size_t>(mem) }, sid{ stream }
-    {
-    }
-    dim3 dg{};
-    dim3 db{};
-    std::size_t shmem{ 0 };
-    cudaStream_t sid{ cudaStreamDefault };
+	dim3 dg {};
+	dim3 db {};
+	std::size_t shmem {0};
+	cudaStream_t sid {cudaStreamDefault};
+
+	template<typename IndexType0, typename IndexType1>
+	LaunchConfig(IndexType0 gs, IndexType1 bs)
+		: dg {static_cast<unsigned int>(gs)}
+		, db {static_cast<unsigned int>(bs)}
+		, shmem {0}
+		, sid {cudaStreamDefault} {}
+
+	template<typename IndexType0, typename IndexType1, typename IndexType2>
+	LaunchConfig(IndexType0 gs, IndexType1 bs, IndexType2 mem)
+		: dg {static_cast<unsigned int>(gs)}
+		, db {static_cast<unsigned int>(bs)}
+		, shmem {static_cast<std::size_t>(mem)}
+		, sid {cudaStreamDefault} {}
+
+	template<typename IndexType0, typename IndexType1, typename IndexType2>
+	LaunchConfig(IndexType0 gs, IndexType1 bs, IndexType2 mem, cudaStream_t stream)
+		: dg {static_cast<unsigned int>(gs)}
+		, db {static_cast<unsigned int>(bs)}
+		, shmem {static_cast<std::size_t>(mem)}
+		, sid {stream} {}
 };
 
-struct LaunchInput { ///< could contain more information on operation (error checking/ time recording/ etc...)
-    LaunchInput() = delete;
-    LaunchInput(std::string kernel, int taskNum, std::size_t sharedMemBytes = 0)
-        : kernelName(kernel), numThreads(taskNum), sharedMemBytes(sharedMemBytes) {}
-    const std::string& name() { return kernelName; }
-    const int& threads() { return numThreads; }
-    const std::size_t& memBytes() { return sharedMemBytes; }
+struct LaunchInput {///< could contain more information on operation (error checking/ time recording/ etc...)
+   private:
+	const std::string kernel_name;
+	const int num_threads;
+	const std::size_t shared_mem_bytes;
 
-private:
-    const std::string kernelName;
-    const int numThreads;
-    const std::size_t sharedMemBytes;
+   public:
+	LaunchInput() = delete;
+	LaunchInput(std::string kernel, int task_num, std::size_t shared_mem_bytes = 0)
+		: kernel_name(kernel)
+		, num_threads(task_num)
+		, shared_mem_bytes(shared_mem_bytes) {}
+
+	const std::string& name() {
+		return kernel_name;
+	}
+
+	const int& threads() {
+		return num_threads;
+	}
+
+	const std::size_t& mem_bytes() {
+		return shared_mem_bytes;
+	}
 };
 
 /// kernel launching configuration
 struct ExecutionPolicy {
-    ExecutionPolicy() {}
-    ExecutionPolicy(int gs, int bs, std::size_t memsize, bool s)
-        : gridSize(gs), blockSize(bs), sharedMemBytes(memsize), sync(s) {}
-    int getGridSize() const { return gridSize; }
-    int getBlockSize() const { return blockSize; }
-    std::size_t getSharedMemBytes() const { return sharedMemBytes; }
-    bool needSync() const { return sync; }
+   private:
+	int grid_size {0};
+	int block_size {0};
+	std::size_t shared_mem_bytes {0};
+	bool sync {false};
 
-private:
-    int gridSize{ 0 };
-    int blockSize{ 0 };
-    std::size_t sharedMemBytes{ 0 };
-    bool sync{ false };
+   public:
+	ExecutionPolicy() {}
+	ExecutionPolicy(int gs, int bs, std::size_t memsize, bool s)
+		: grid_size(gs)
+		, block_size(bs)
+		, shared_mem_bytes(memsize)
+		, sync(s) {}
+
+	int get_grid_size() const {
+		return grid_size;
+	}
+
+	int get_block_size() const {
+		return block_size;
+	}
+
+	std::size_t get_shared_mem_bytes() const {
+		return shared_mem_bytes;
+	}
+
+	bool need_sync() const {
+		return sync;
+	}
 };
 
-} // namespace mn
+}// namespace mn
 
 #endif

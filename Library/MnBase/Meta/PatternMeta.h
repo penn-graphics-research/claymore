@@ -1,23 +1,24 @@
-#ifndef __PATTERN_META_H_
-#define __PATTERN_META_H_
+#ifndef PATTERN_META_H
+#define PATTERN_META_H
 
-#include "TypeMeta.h"
 #include <initializer_list>
 #include <type_traits>
 
+#include "TypeMeta.h"
+
 namespace mn {
 
-template <typename, typename> struct gather;
+template<typename, typename>
+struct gather;
 
 /// Seq must be integer_sequence
-template <std::size_t... Is, typename ValueSeq>
+template<std::size_t... Is, typename ValueSeq>
 struct gather<std::index_sequence<Is...>, ValueSeq> {
-  using type = std::integer_sequence<typename ValueSeq::value_type,
-                                select_value<Is, ValueSeq>::value...>;
+	using type = std::integer_sequence<typename ValueSeq::value_type, select_value<Is, ValueSeq>::value...>;
 };
-template <typename Indices, typename ValueSeq>
+template<typename Indices, typename ValueSeq>
 using gather_t = typename gather<Indices, ValueSeq>::type;
 
-} // namespace mn
+}// namespace mn
 
 #endif

@@ -18,7 +18,7 @@ CPMAddPackage(
 )
 if(rapidjson_ADDED)
   add_library(rapidjson INTERFACE IMPORTED)
-  target_include_directories(rapidjson INTERFACE ${rapidjson_SOURCE_DIR}/include)
+  target_include_directories(rapidjson SYSTEM INTERFACE ${rapidjson_SOURCE_DIR}/include)
 endif()
 
 # cxxopts
@@ -48,7 +48,7 @@ CPMAddPackage(
 )
 if(range-v3_ADDED) 
   add_library(range-v3 INTERFACE IMPORTED)
-  target_include_directories(range-v3 INTERFACE ${range-v3_SOURCE_DIR}/include)
+  target_include_directories(range-v3 SYSTEM INTERFACE ${range-v3_SOURCE_DIR}/include)
 endif()
 
 # fmt
@@ -57,6 +57,9 @@ CPMAddPackage(
   GIT_TAG 6.2.1
   GITHUB_REPOSITORY fmtlib/fmt
 )
+if(fmt_ADDED) 
+  target_include_directories(fmt SYSTEM INTERFACE ${fmt_SOURCE_DIR}/include)
+endif()
 
 # glm
 CPMAddPackage(
@@ -73,5 +76,5 @@ CPMAddPackage(
 )
 if(filesystem_ADDED) 
   add_library(filesystem INTERFACE IMPORTED)
-  target_include_directories(filesystem INTERFACE ${filesystem_SOURCE_DIR}/include)
+  target_include_directories(filesystem SYSTEM INTERFACE ${filesystem_SOURCE_DIR}/include)
 endif()

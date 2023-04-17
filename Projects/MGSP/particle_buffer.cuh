@@ -1,194 +1,209 @@
-#ifndef __PARTICLE_BUFFER_CUH_
-#define __PARTICLE_BUFFER_CUH_
-#include "settings.h"
+#ifndef PARTICLE_BUFFER_CUH
+#define PARTICLE_BUFFER_CUH
 #include <MnBase/Meta/Polymorphism.h>
+
+#include "settings.h"
+
+//NOLINTNEXTLINE(cppcoreguidelines-macro-usage) Macro usage necessary here for preprocessor if
+#define PRINT_NEGATIVE_BLOGNOS 1
 
 namespace mn {
 
-using ParticleBinDomain = aligned_domain<char, config::g_bin_capacity>;
-using ParticleBufferDomain = compact_domain<int, config::g_max_particle_bin>;
-using ParticleArrayDomain = compact_domain<int, config::g_max_particle_num>;
+using ParticleBinDomain	   = AlignedDomain<char, config::G_BIN_CAPACITY>;
+using ParticleBufferDomain = CompactDomain<int, config::G_MAX_PARTICLE_BIN>;
+using ParticleArrayDomain  = CompactDomain<int, config::G_MAX_PARTICLE_NUM>;
+//NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables, readability-identifier-naming) Check is buggy and reporst variable errors fro template arguments
+using particle_bin4_  = Structural<StructuralType::DENSE, Decorator<StructuralAllocationPolicy::FULL_ALLOCATION, StructuralPaddingPolicy::SUM_POW2_ALIGN>, ParticleBinDomain, attrib_layout::SOA, f32_, f32_, f32_, f32_>;														///< J, pos
+using particle_bin12_ = Structural<StructuralType::DENSE, Decorator<StructuralAllocationPolicy::FULL_ALLOCATION, StructuralPaddingPolicy::SUM_POW2_ALIGN>, ParticleBinDomain, attrib_layout::SOA, f32_, f32_, f32_, f32_, f32_, f32_, f32_, f32_, f32_, f32_, f32_, f32_>;		///< pos, F
+using particle_bin13_ = Structural<StructuralType::DENSE, Decorator<StructuralAllocationPolicy::FULL_ALLOCATION, StructuralPaddingPolicy::SUM_POW2_ALIGN>, ParticleBinDomain, attrib_layout::SOA, f32_, f32_, f32_, f32_, f32_, f32_, f32_, f32_, f32_, f32_, f32_, f32_, f32_>;///< pos, F, logJp
+//NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables, readability-identifier-naming)
 
-using particle_bin4_ =
-    structural<structural_type::dense,
-               decorator<structural_allocation_policy::full_allocation,
-                         structural_padding_policy::sum_pow2_align>,
-               ParticleBinDomain, attrib_layout::soa, f32_, f32_, f32_,
-               f32_>; ///< J, pos
-using particle_bin12_ =
-    structural<structural_type::dense,
-               decorator<structural_allocation_policy::full_allocation,
-                         structural_padding_policy::sum_pow2_align>,
-               ParticleBinDomain, attrib_layout::soa, f32_, f32_, f32_, f32_,
-               f32_, f32_, f32_, f32_, f32_, f32_, f32_, f32_>; ///< pos, F
-using particle_bin13_ =
-    structural<structural_type::dense,
-               decorator<structural_allocation_policy::full_allocation,
-                         structural_padding_policy::sum_pow2_align>,
-               ParticleBinDomain, attrib_layout::soa, f32_, f32_, f32_, f32_,
-               f32_, f32_, f32_, f32_, f32_, f32_, f32_, f32_,
-               f32_>; ///< pos, F, logJp
-template <material_e mt> struct particle_bin_;
-template <> struct particle_bin_<material_e::JFluid> : particle_bin4_ {};
-template <>
-struct particle_bin_<material_e::FixedCorotated> : particle_bin12_ {};
-template <> struct particle_bin_<material_e::Sand> : particle_bin13_ {};
-template <> struct particle_bin_<material_e::NACC> : particle_bin13_ {};
+template<MaterialE Mt>
+struct particle_bin_;
+template<>
+struct particle_bin_<MaterialE::J_FLUID> : particle_bin4_ {};
+template<>
+struct particle_bin_<MaterialE::FIXED_COROTATED> : particle_bin12_ {};
+template<>
+struct particle_bin_<MaterialE::SAND> : particle_bin13_ {};
+template<>
+struct particle_bin_<MaterialE::NACC> : particle_bin13_ {};
 
-template <typename ParticleBin>
-using particle_buffer_ =
-    structural<structural_type::dynamic,
-               decorator<structural_allocation_policy::full_allocation,
-                         structural_padding_policy::compact>,
-               ParticleBufferDomain, attrib_layout::aos, ParticleBin>;
-using particle_array_ =
-    structural<structural_type::dynamic,
-               decorator<structural_allocation_policy::full_allocation,
-                         structural_padding_policy::compact>,
-               ParticleArrayDomain, attrib_layout::aos, f32_, f32_, f32_>;
+//NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables, readability-identifier-naming) Check is buggy and reporst variable errors fro template arguments
+template<typename ParticleBin>
+using particle_buffer_ = Structural<StructuralType::DYNAMIC, Decorator<StructuralAllocationPolicy::FULL_ALLOCATION, StructuralPaddingPolicy::COMPACT>, ParticleBufferDomain, attrib_layout::AOS, ParticleBin>;
+using particle_array_  = Structural<StructuralType::DYNAMIC, Decorator<StructuralAllocationPolicy::FULL_ALLOCATION, StructuralPaddingPolicy::COMPACT>, ParticleArrayDomain, attrib_layout::AOS, f32_, f32_, f32_>;
+//NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables, readability-identifier-naming)
 
-template <material_e mt>
-struct ParticleBufferImpl : Instance<particle_buffer_<particle_bin_<mt>>> {
-  static constexpr material_e materialType = mt;
-  using base_t = Instance<particle_buffer_<particle_bin_<mt>>>;
+template<MaterialE Mt>
+struct ParticleBufferImpl : Instance<particle_buffer_<particle_bin_<Mt>>> {
+	static constexpr MaterialE MATERIAL_TYPE = Mt;
+	using base_t							 = Instance<particle_buffer_<particle_bin_<Mt>>>;
 
-  template <typename Allocator>
-  ParticleBufferImpl(Allocator allocator)
-      : base_t{spawn<particle_buffer_<particle_bin_<mt>>, orphan_signature>(
-            allocator)} {}
-  template <typename Allocator>
-  void checkCapacity(Allocator allocator, std::size_t capacity) {
-    if (capacity > this->_capacity)
-      this->resize(allocator, capacity);
-  }
+	std::size_t num_active_blocks;
+	int* ppcs;
+	int* ppbs;
+	int* cellbuckets;
+	int* blockbuckets;
+	int* binsts;
+
+	template<typename Allocator>
+	explicit ParticleBufferImpl(Allocator allocator)
+		: base_t {spawn<particle_buffer_<particle_bin_<Mt>>, orphan_signature>(allocator)}
+		, num_active_blocks()
+		, ppcs(nullptr)
+		, ppbs(nullptr)
+		, cellbuckets(nullptr)
+		, blockbuckets(nullptr)
+		, binsts(nullptr) {}
+
+	template<typename Allocator>
+	void check_capacity(Allocator allocator, std::size_t capacity) {
+		if(capacity > this->_capacity)
+			this->resize(allocator, capacity);
+	}
 };
 
-template <material_e mt> struct ParticleBuffer;
-template <>
-struct ParticleBuffer<material_e::JFluid>
-    : ParticleBufferImpl<material_e::JFluid> {
-  using base_t = ParticleBufferImpl<material_e::JFluid>;
-  static constexpr float rho = DENSITY;
-  static constexpr float volume =
-      (1.f / (1 << DOMAIN_BITS) / (1 << DOMAIN_BITS) / (1 << DOMAIN_BITS) /
-       MODEL_PPC);
-  static constexpr float mass =
-      (DENSITY / (1 << DOMAIN_BITS) / (1 << DOMAIN_BITS) / (1 << DOMAIN_BITS) /
-       MODEL_PPC);
-  static constexpr float bulk = 4e4;
-  static constexpr float gamma = 7.15f;
-  static constexpr float visco = 0.01f;
-  template <typename Allocator>
-  ParticleBuffer(Allocator allocator) : base_t{allocator} {}
+//NOTE: In subsequent classes some parameters are actually const and static, but they are nit declared as such to allow consistent access to the members
+//TODO: Maybe write accessors; Maybe create common baseclass(es) for accessing the parameters
+
+template<MaterialE Mt>
+struct ParticleBuffer;
+template<>
+struct ParticleBuffer<MaterialE::J_FLUID> : ParticleBufferImpl<MaterialE::J_FLUID> {
+	using base_t = ParticleBufferImpl<MaterialE::J_FLUID>;
+
+	//NOLINTBEGIN(readability-magic-numbers) Parameter definitions
+	float rho	 = config::DENSITY;
+	float volume = (1.0f / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / config::MODEL_PPC);
+	float mass	 = (config::DENSITY / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / config::MODEL_PPC);
+	float bulk	 = 4e4;
+	float gamma	 = 7.15f;
+	float visco	 = 0.01f;
+
+	void update_parameters(float density, float vol, float b, float g, float v) {
+		rho	   = density;
+		volume = vol;
+		mass   = volume * density;
+		bulk   = b;
+		gamma  = g;
+		visco  = v;
+	}
+	//NOLINTEND(readability-magic-numbers)
+
+	template<typename Allocator>
+	explicit ParticleBuffer(Allocator allocator)
+		: base_t {allocator} {}
 };
 
-template <>
-struct ParticleBuffer<material_e::FixedCorotated>
-    : ParticleBufferImpl<material_e::FixedCorotated> {
-  using base_t = ParticleBufferImpl<material_e::FixedCorotated>;
-  static constexpr float rho = DENSITY;
-  static constexpr float volume =
-      (1.f / (1 << DOMAIN_BITS) / (1 << DOMAIN_BITS) / (1 << DOMAIN_BITS) /
-       MODEL_PPC);
-  static constexpr float mass =
-      (DENSITY / (1 << DOMAIN_BITS) / (1 << DOMAIN_BITS) / (1 << DOMAIN_BITS) /
-       MODEL_PPC);
-  static constexpr float E = YOUNGS_MODULUS;
-  static constexpr float nu = POISSON_RATIO;
-  static constexpr float lambda =
-      YOUNGS_MODULUS * POISSON_RATIO /
-      ((1 + POISSON_RATIO) * (1 - 2 * POISSON_RATIO));
-  static constexpr float mu = YOUNGS_MODULUS / (2 * (1 + POISSON_RATIO));
-  template <typename Allocator>
-  ParticleBuffer(Allocator allocator) : base_t{allocator} {}
+template<>
+struct ParticleBuffer<MaterialE::FIXED_COROTATED> : ParticleBufferImpl<MaterialE::FIXED_COROTATED> {
+	using base_t = ParticleBufferImpl<MaterialE::FIXED_COROTATED>;
+
+	//NOLINTBEGIN(readability-magic-numbers) Parameter definitions
+	float rho	 = config::DENSITY;
+	float volume = (10.f / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / config::MODEL_PPC);
+	float mass	 = (config::DENSITY / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / config::MODEL_PPC);
+	float e		 = config::YOUNGS_MODULUS;
+	float nu	 = config::POISSON_RATIO;
+	float lambda = config::YOUNGS_MODULUS * config::POISSON_RATIO / ((1 + config::POISSON_RATIO) * (1 - 2 * config::POISSON_RATIO));
+	float mu	 = config::YOUNGS_MODULUS / (2 * (1 + config::POISSON_RATIO));
+
+	void update_parameters(float density, float vol, float e, float nu) {
+		rho	   = density;
+		volume = vol;
+		mass   = volume * density;
+		lambda = e * nu / ((1 + nu) * (1 - 2 * nu));
+		mu	   = e / (2 * (1 + nu));
+	}
+	//NOLINTEND(readability-magic-numbers)
+
+	template<typename Allocator>
+	explicit ParticleBuffer(Allocator allocator)
+		: base_t {allocator} {}
 };
 
-template <>
-struct ParticleBuffer<material_e::Sand> : ParticleBufferImpl<material_e::Sand> {
-  using base_t = ParticleBufferImpl<material_e::Sand>;
-  static constexpr float rho = DENSITY;
-  static constexpr float volume =
-      (1.f / (1 << DOMAIN_BITS) / (1 << DOMAIN_BITS) / (1 << DOMAIN_BITS) /
-       MODEL_PPC);
-  static constexpr float mass =
-      (DENSITY / (1 << DOMAIN_BITS) / (1 << DOMAIN_BITS) / (1 << DOMAIN_BITS) /
-       MODEL_PPC);
-  static constexpr float E = YOUNGS_MODULUS;
-  static constexpr float nu = POISSON_RATIO;
-  static constexpr float lambda =
-      YOUNGS_MODULUS * POISSON_RATIO /
-      ((1 + POISSON_RATIO) * (1 - 2 * POISSON_RATIO));
-  static constexpr float mu = YOUNGS_MODULUS / (2 * (1 + POISSON_RATIO));
+template<>
+struct ParticleBuffer<MaterialE::SAND> : ParticleBufferImpl<MaterialE::SAND> {
+	using base_t = ParticleBufferImpl<MaterialE::SAND>;
 
-  static constexpr float logJp0 = 0.f;
-  static constexpr float frictionAngle = 30.f;
-  static constexpr float cohesion = 0.f;
-  static constexpr float beta = 1.f;
-  // std::sqrt(2.f/3.f) * 2.f * std::sin(30.f/180.f*3.141592741f)
-  // 						/ (3.f -
-  // std::sin(30.f/180.f*3.141592741f))
-  static constexpr float yieldSurface =
-      0.816496580927726f * 2.f * 0.5f / (3.f - 0.5f);
-  static constexpr bool volumeCorrection = true;
+	//NOLINTBEGIN(readability-magic-numbers) Parameter definitions; consistent naming
+	float rho	 = config::DENSITY;
+	float volume = (10.f / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / config::MODEL_PPC);
+	float mass	 = (config::DENSITY / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / config::MODEL_PPC);
+	float r		 = config::YOUNGS_MODULUS;
+	float nu	 = config::POISSON_RATIO;
+	float lambda = config::YOUNGS_MODULUS * config::POISSON_RATIO / ((1 + config::POISSON_RATIO) * (1 - 2 * config::POISSON_RATIO));
+	float mu	 = config::YOUNGS_MODULUS / (2 * (1 + config::POISSON_RATIO));
 
-  template <typename Allocator>
-  ParticleBuffer(Allocator allocator) : base_t{allocator} {}
+	static constexpr float LOG_JP_0 = 0.0f;
+	float friction_angle			= 30.f;
+	float cohesion					= 0.0f;
+	float beta						= 1.0f;
+	// std::sqrt(2.f/3.f) * 2.f * std::sin(30.f/180.f*3.141592741f)
+	// 						/ (3.f -
+	// std::sin(30.f/180.f*3.141592741f))
+	float yield_surface	   = 0.816496580927726f * 2.f * 0.5f / (3.f - 0.5f);
+	bool volume_correction = true;
+	//NOLINTEND(readability-magic-numbers)
+
+	template<typename Allocator>
+	explicit ParticleBuffer(Allocator allocator)
+		: base_t {allocator} {}
 };
 
-template <>
-struct ParticleBuffer<material_e::NACC> : ParticleBufferImpl<material_e::NACC> {
-  using base_t = ParticleBufferImpl<material_e::NACC>;
-  static constexpr float rho = DENSITY;
-  static constexpr float volume =
-      (1.f / (1 << DOMAIN_BITS) / (1 << DOMAIN_BITS) / (1 << DOMAIN_BITS) /
-       MODEL_PPC);
-  static constexpr float mass =
-      (DENSITY / (1 << DOMAIN_BITS) / (1 << DOMAIN_BITS) / (1 << DOMAIN_BITS) /
-       MODEL_PPC);
-  static constexpr float E = YOUNGS_MODULUS;
-  static constexpr float nu = POISSON_RATIO;
-  static constexpr float lambda =
-      YOUNGS_MODULUS * POISSON_RATIO /
-      ((1 + POISSON_RATIO) * (1 - 2 * POISSON_RATIO));
-  static constexpr float mu = YOUNGS_MODULUS / (2 * (1 + POISSON_RATIO));
+template<>
+struct ParticleBuffer<MaterialE::NACC> : ParticleBufferImpl<MaterialE::NACC> {
+	using base_t = ParticleBufferImpl<MaterialE::NACC>;
 
-  static constexpr float frictionAngle = 45.f;
-  static constexpr float bm =
-      2.f / 3.f * (YOUNGS_MODULUS / (2 * (1 + POISSON_RATIO))) +
-      (YOUNGS_MODULUS * POISSON_RATIO /
-       ((1 + POISSON_RATIO) *
-        (1 - 2 * POISSON_RATIO)));  ///< bulk modulus, kappa
-  static constexpr float xi = 0.8f; ///< hardening factor
-  static constexpr float logJp0 = -0.01f;
-  static constexpr float beta = 0.5f;
-  static constexpr float mohrColumbFriction =
-      0.503599787772409; //< sqrt((T)2 / (T)3) * (T)2 * sin_phi / ((T)3 -
-                         // sin_phi);
-  static constexpr float M =
-      1.850343771924453; ///< mohrColumbFriction * (T)dim / sqrt((T)2 / ((T)6
-                         ///< - dim));
-  static constexpr float Msqr = 3.423772074299613;
-  static constexpr bool hardeningOn = true;
+	//NOLINTBEGIN(readability-magic-numbers) Parameter definitions
+	float rho	 = config::DENSITY;
+	float volume = (1.0f / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / config::MODEL_PPC);
+	float mass	 = (config::DENSITY / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / config::MODEL_PPC);
+	float e		 = config::YOUNGS_MODULUS;
+	float nu	 = config::POISSON_RATIO;
+	float lambda = config::YOUNGS_MODULUS * config::POISSON_RATIO / ((1 + config::POISSON_RATIO) * (1 - 2 * config::POISSON_RATIO));
+	float mu	 = config::YOUNGS_MODULUS / (2 * (1 + config::POISSON_RATIO));
 
-  template <typename Allocator>
-  ParticleBuffer(Allocator allocator) : base_t{allocator} {}
+	float friction_angle			= 45.f;
+	float bm						= 2.f / 3.f * (config::YOUNGS_MODULUS / (2 * (1 + config::POISSON_RATIO))) + (config::YOUNGS_MODULUS * config::POISSON_RATIO / ((1 + config::POISSON_RATIO) * (1 - 2 * config::POISSON_RATIO)));///< bulk modulus, kappa
+	float xi						= 0.8f;																																															///< hardening factor
+	static constexpr float LOG_JP_0 = -0.01f;
+	float beta						= 0.5f;
+	float mohr_columb_friction		= 0.503599787772409;//< sqrt((T)2 / (T)3) * (T)2 * sin_phi / ((T)3 - sin_phi);
+	float m							= 1.850343771924453;//< mohr_columb_friction * (T)dim / sqrt((T)2 / ((T)6 - dim));
+	float msqr						= 3.423772074299613;
+	bool hardening_on				= true;
+
+	void update_parameters(float density, float vol, float e, float nu, float be, float x) {
+		rho	   = density;
+		volume = vol;
+		mass   = volume * density;
+		lambda = e * nu / ((1 + nu) * (1 - 2 * nu));
+		mu	   = e / (2 * (1 + nu));
+		bm	   = 2.f / 3.f * (e / (2 * (1 + nu))) + (e * nu / ((1 + nu) * (1 - 2 * nu)));
+		beta   = be;
+		xi	   = x;
+	}
+	//NOLINTEND(readability-magic-numbers)
+
+	template<typename Allocator>
+	explicit ParticleBuffer(Allocator allocator)
+		: base_t {allocator} {}
 };
 
 /// conversion
 /// http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0608r3.html
-using particle_buffer_t =
-    variant<ParticleBuffer<material_e::JFluid>,
-            ParticleBuffer<material_e::FixedCorotated>,
-            ParticleBuffer<material_e::Sand>, ParticleBuffer<material_e::NACC>>;
+using particle_buffer_t = variant<ParticleBuffer<MaterialE::J_FLUID>, ParticleBuffer<MaterialE::FIXED_COROTATED>, ParticleBuffer<MaterialE::SAND>, ParticleBuffer<MaterialE::NACC>>;
 
 struct ParticleArray : Instance<particle_array_> {
-  using base_t = Instance<particle_array_>;
-  ParticleArray &operator=(base_t &&instance) {
-    static_cast<base_t &>(*this) = instance;
-    return *this;
-  }
+	using base_t = Instance<particle_array_>;
+
+	ParticleArray() = default;
+	explicit ParticleArray(base_t&& instance)//NOLINT(cppcoreguidelines-rvalue-reference-param-not-moved) Clang say, that std::move has no effect here
+		: base_t(instance) {}
 };
 
-} // namespace mn
+}// namespace mn
 
 #endif

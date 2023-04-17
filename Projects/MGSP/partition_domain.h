@@ -1,61 +1,74 @@
-#ifndef __PARTITION_DOMAIN_H_
-#define __PARTITION_DOMAIN_H_
+#ifndef PARTITION_DOMAIN_H
+#define PARTITION_DOMAIN_H
 #include <MnBase/Math/Vec.h>
 #include <MnBase/Meta/Polymorphism.h>
 
 namespace mn {
 
-template <typename Derived, typename Tn, int dim> struct partition_domain {
-  using index = Tn[dim];
+template<typename Derived, typename Tn, int Dim>
+struct PartitionDomain {
+	using index = std::array<Tn, Dim>;
 
-  template <typename Index = index>
-  constexpr bool inside(Index &&id) const noexcept {
-    return self().inside(std::forward<Index>(id));
-  }
-  template <typename Offset, typename Index = index>
-  constexpr bool within(Index &&id, Offset &&l, Offset &&u) const noexcept {
-    return self().within(std::forward<Index>(id), std::forward<Index>(l),
-                         std::forward<Index>(u));
-  }
+	template<typename Index = index>
+	constexpr bool inside(Index&& id) const noexcept {
+		return self().inside(std::forward<Index>(id));
+	}
+	template<typename Offset, typename Index = index>
+	constexpr bool within(Index&& id, Offset&& l, Offset&& u) const noexcept {
+		return self().within(std::forward<Index>(id), std::forward<Index>(l), std::forward<Index>(u));
+	}
 
-protected:
-  auto &self() noexcept { return static_cast<Derived &>(*this); }
+   protected:
+	auto& self() noexcept {
+		return static_cast<Derived&>(*this);
+	}
 };
 
-template <typename Tn, int dim>
-struct box_domain : partition_domain<box_domain<Tn, dim>, Tn, dim> {
-  using base_t = partition_domain<box_domain<Tn, dim>, Tn, dim>;
-  using index = typename base_t::index;
-  constexpr box_domain() noexcept {}
-  constexpr box_domain(index lower, index upper) {
-    for (int d = 0; d < dim; ++d) {
-      _min[d] = lower[d];
-      _max[d] = upper[d];
-    }
-  }
-  constexpr box_domain(vec<Tn, dim> lower, vec<Tn, dim> upper) {
-    for (int d = 0; d < dim; ++d) {
-      _min[d] = lower[d];
-      _max[d] = upper[d];
-    }
-  }
-  template <typename Index = index>
-  constexpr bool inside(Index &&id) const noexcept {
-    for (int d = 0; d < dim; ++d)
-      if (id[d] < _min[d] || id[d] > _max[d])
-        return false;
-    return true;
-  }
-  template <typename Offset, typename Index = index>
-  constexpr bool within(Index &&id, Offset &&l, Offset &&u) const noexcept {
-    for (int d = 0; d < dim; ++d)
-      if (id[d] < _min[d] + l[d] || id[d] > _max[d] + u[d])
-        return false;
-    return true;
-  }
-  index _min, _max;
+template<typename Tn, int Dim>
+struct BoxDomain : PartitionDomain<BoxDomain<Tn, Dim>, Tn, Dim> {
+	using base_t = PartitionDomain<BoxDomain<Tn, Dim>, Tn, Dim>;
+	using index	 = typename base_t::index;
+
+	index min;
+	index max;
+
+	constexpr BoxDomain() noexcept = default;
+
+	constexpr BoxDomain(index lower, index upper) {
+		for(int d = 0; d < Dim; ++d) {
+			min[d] = lower[d];
+			max[d] = upper[d];
+		}
+	}
+
+	constexpr BoxDomain(vec<Tn, Dim> lower, vec<Tn, Dim> upper) {
+		for(int d = 0; d < Dim; ++d) {
+			min[d] = lower[d];
+			max[d] = upper[d];
+		}
+	}
+
+	template<typename Index = index>
+	constexpr bool inside(Index&& id) const noexcept {
+		for(int d = 0; d < Dim; ++d) {
+			if(id[d] < min[d] || id[d] > max[d]) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	template<typename Offset, typename Index = index>
+	constexpr bool within(Index&& id, Offset&& l, Offset&& u) const noexcept {
+		for(int d = 0; d < Dim; ++d) {
+			if(id[d] < min[d] + l[d] || id[d] > max[d] + u[d]) {
+				return false;
+			}
+		}
+		return true;
+	}
 };
 
-} // namespace mn
+}// namespace mn
 
 #endif

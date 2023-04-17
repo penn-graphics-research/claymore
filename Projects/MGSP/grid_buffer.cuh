@@ -1,55 +1,41 @@
-#ifndef __GRID_BUFFER_CUH_
-#define __GRID_BUFFER_CUH_
-#include "mgmpm_kernels.cuh"
-#include "settings.h"
+#ifndef GRID_BUFFER_CUH
+#define GRID_BUFFER_CUH
 #include <MnSystem/Cuda/HostUtils.hpp>
 
+#include "mgmpm_kernels.cuh"
+#include "settings.h"
+
 namespace mn {
+using namespace placeholder;//NOLINT(google-build-using-namespace) Allow placeholders to be included generally for simplification
 
-using BlockDomain = compact_domain<char, config::g_blocksize,
-                                   config::g_blocksize, config::g_blocksize>;
-using GridDomain = compact_domain<int, config::g_grid_size, config::g_grid_size,
-                                  config::g_grid_size>;
-using GridBufferDomain = compact_domain<int, config::g_max_active_block>;
+//NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables, readability-identifier-naming) Check is buggy and reporst variable errors fro template arguments
+using BlockDomain	   = CompactDomain<char, config::G_BLOCKSIZE, config::G_BLOCKSIZE, config::G_BLOCKSIZE>;
+using GridDomain	   = CompactDomain<int, config::G_GRID_SIZE, config::G_GRID_SIZE, config::G_GRID_SIZE>;
+using GridBufferDomain = CompactDomain<int, config::G_MAX_ACTIVE_BLOCK>;
 
-using grid_block_ =
-    structural<structural_type::dense,
-               decorator<structural_allocation_policy::full_allocation,
-                         structural_padding_policy::sum_pow2_align>,
-               BlockDomain, attrib_layout::soa, f32_, f32_, f32_, f32_>;
-using grid_ =
-    structural<structural_type::dense,
-               decorator<structural_allocation_policy::full_allocation,
-                         structural_padding_policy::compact>,
-               GridDomain, attrib_layout::aos, grid_block_>;
-using grid_buffer_ =
-    structural<structural_type::dynamic,
-               decorator<structural_allocation_policy::full_allocation,
-                         structural_padding_policy::compact>,
-               GridBufferDomain, attrib_layout::aos, grid_block_>;
+using grid_block_  = Structural<StructuralType::DENSE, Decorator<StructuralAllocationPolicy::FULL_ALLOCATION, StructuralPaddingPolicy::SUM_POW2_ALIGN>, BlockDomain, attrib_layout::SOA, f32_, f32_, f32_, f32_>;
+using grid_		   = Structural<StructuralType::DENSE, Decorator<StructuralAllocationPolicy::FULL_ALLOCATION, StructuralPaddingPolicy::COMPACT>, GridDomain, attrib_layout::AOS, grid_block_>;
+using grid_buffer_ = Structural<StructuralType::DYNAMIC, Decorator<StructuralAllocationPolicy::FULL_ALLOCATION, StructuralPaddingPolicy::COMPACT>, GridBufferDomain, attrib_layout::AOS, grid_block_>;
+//NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables, readability-identifier-naming)
 
 struct GridBuffer : Instance<grid_buffer_> {
-  using base_t = Instance<grid_buffer_>;
+	using base_t = Instance<grid_buffer_>;
 
-  template <typename Allocator>
-  GridBuffer(Allocator allocator)
-      : base_t{spawn<grid_buffer_, orphan_signature>(allocator)} {}
-  template <typename Allocator>
-  void checkCapacity(Allocator allocator, std::size_t capacity) {
-    if (capacity > _capacity)
-      resize(capacity, capacity);
-  }
-  template <typename CudaContext> void reset(int blockCnt, CudaContext &cuDev) {
-    using namespace placeholder;
-#if 0
-    checkCudaErrors(cudaMemsetAsync((void *)&this->val_1d(_0, 0), 0,
-                                    grid_block_::size * blockCnt, cuDev.stream_compute()));
-#else
-    cuDev.compute_launch({blockCnt, config::g_blockvolume}, clear_grid, *this);
-#endif
-  }
+	template<typename Allocator>
+	explicit GridBuffer(Allocator allocator)
+		: base_t {spawn<grid_buffer_, orphan_signature>(allocator)} {}
+	template<typename Allocator>
+	void check_capacity(Allocator allocator, std::size_t capacity) {
+		if(capacity > _capacity)
+			resize(capacity, capacity);
+	}
+	template<typename CudaContext>
+	void reset(int block_cnt, CudaContext& cu_dev) {
+		//check_cuda_errors(cudaMemsetAsync((void *)&this->val_1d(_0, 0), 0, grid_block_::size * block_cnt, cu_dev.stream_compute()));
+		cu_dev.compute_launch({block_cnt, config::G_BLOCKVOLUME}, clear_grid, *this);
+	}
 };
 
-} // namespace mn
+}// namespace mn
 
 #endif

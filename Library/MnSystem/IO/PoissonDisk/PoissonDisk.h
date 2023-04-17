@@ -1,24 +1,24 @@
-#include <string>
-#include <iostream>
 #include <fstream>
+#include <iostream>
+#include <string>
 #include <vector>
 
-#include "cySampleElim.h"
 #include "cyPoint.h"
+#include "cySampleElim.h"
 
-class PoissonDisk
-{
-public:
+class PoissonDisk {
+   public:
 	PoissonDisk();
 	~PoissonDisk();
 
 	void LoadSDF(std::string filename);
 	void GenerateSamples(int samplesPerVol, std::vector<float>& outputSamples, int inputScale = 5);
 
-protected:
-	inline float fetchGrid(int i, int j, int k) { return m_phiGrid[i + m_ni*(j + m_nj*k)];}
-	inline float fetchGridTrilinear(float x, float y, float z)
-	{
+   protected:
+	inline float fetchGrid(int i, int j, int k) {
+		return m_phiGrid[i + m_ni * (j + m_nj * k)];
+	}
+	inline float fetchGridTrilinear(float x, float y, float z) {
 		float dx = x - floor(x);
 		float dy = y - floor(y);
 		float dz = z - floor(z);
@@ -42,25 +42,21 @@ protected:
 
 		return c0 * (1 - dz) + c1 * dz;
 	}
-private:
-	int					m_ni, m_nj, m_nk;
-	float				m_dx;
-	int					m_padding;
-	cyPoint3f			m_minBox;
-	std::vector<float>	m_phiGrid;
+
+   private:
+	int m_ni, m_nj, m_nk;
+	float m_dx;
+	int m_padding;
+	cyPoint3f m_minBox;
+	std::vector<float> m_phiGrid;
 	cy::WeightedSampleElimination<cy::Point3f, float, 3, int> m_wse;
 };
 
-PoissonDisk::PoissonDisk()
-{
-}
+PoissonDisk::PoissonDisk() {}
 
-PoissonDisk::~PoissonDisk()
-{
-}
+PoissonDisk::~PoissonDisk() {}
 
-void PoissonDisk::LoadSDF(std::string filename)
-{
+void PoissonDisk::LoadSDF(std::string filename) {
 	std::ifstream infile(filename);
 	infile >> m_ni >> m_nj >> m_nk;
 	infile >> m_minBox[0] >> m_minBox[1] >> m_minBox[2];
@@ -70,22 +66,21 @@ void PoissonDisk::LoadSDF(std::string filename)
 
 	int gridSize = m_ni * m_nj * m_nk;
 	m_phiGrid.resize(gridSize);
-	for (int i = 0; i < gridSize; ++i) {
+	for(int i = 0; i < gridSize; ++i) {
 		infile >> m_phiGrid[i];
 	}
 	infile.close();
 }
 
-void PoissonDisk::GenerateSamples(int samplesPerVol, std::vector<float>& outputSamples, int inputScale)
-{
+void PoissonDisk::GenerateSamples(int samplesPerVol, std::vector<float>& outputSamples, int inputScale) {
 	int numSamples = m_phiGrid.size() * samplesPerVol;
 
 	std::cout << "Generate input " << numSamples * inputScale << " samples...";
 	std::vector<cy::Point3f> inputPoints(numSamples * inputScale);
-	for (size_t i = 0; i < inputPoints.size(); i++) {
-		inputPoints[i].x = (float)rand() / RAND_MAX * (m_ni - 1);
-		inputPoints[i].y = (float)rand() / RAND_MAX * (m_nj - 1);
-		inputPoints[i].z = (float)rand() / RAND_MAX * (m_nk - 1);
+	for(size_t i = 0; i < inputPoints.size(); i++) {
+		inputPoints[i].x = (float) rand() / RAND_MAX * (m_ni - 1);
+		inputPoints[i].y = (float) rand() / RAND_MAX * (m_nj - 1);
+		inputPoints[i].z = (float) rand() / RAND_MAX * (m_nk - 1);
 	}
 	std::cout << "done\n";
 
@@ -96,10 +91,8 @@ void PoissonDisk::GenerateSamples(int samplesPerVol, std::vector<float>& outputS
 	std::cout << "done\n";
 
 	outputSamples.clear();
-	for (int i = 0; i < (int)tmpPoints.size(); i++)
-	{
-		if (fetchGridTrilinear(tmpPoints[i].x, tmpPoints[i].y, tmpPoints[i].z) < 0)
-		{
+	for(int i = 0; i < (int) tmpPoints.size(); i++) {
+		if(fetchGridTrilinear(tmpPoints[i].x, tmpPoints[i].y, tmpPoints[i].z) < 0) {
 			outputSamples.push_back(tmpPoints[i].x);
 			outputSamples.push_back(tmpPoints[i].y);
 			outputSamples.push_back(tmpPoints[i].z);
