@@ -1,6 +1,6 @@
 #####
 set(CPM_DOWNLOAD_LOCATION "${CMAKE_BINARY_DIR}/cmake/CPM.cmake")
-set(CPM_DOWNLOAD_VERSION 0.27.1)
+set(CPM_DOWNLOAD_VERSION 0.38.1)
 
 if(NOT (EXISTS ${CPM_DOWNLOAD_LOCATION} AND CPM_VERSION STREQUAL CPM_DOWNLOAD_VERSION))
   message(STATUS "Downloading CPM.cmake")
@@ -10,11 +10,17 @@ endif()
 include(${CPM_DOWNLOAD_LOCATION})
 #####
 
+#Suppress warning
+cmake_policy(SET CMP0077 NEW)
+
 # rapidjson
 CPMAddPackage(
   NAME rapidjson
-  GIT_TAG f56928de85d56add3ca6ae7cf7f119a42ee1585b
+  GIT_TAG 949c771b03de448bdedea80c44a4a5f65284bfeb
   GITHUB_REPOSITORY Tencent/rapidjson
+  OPTIONS
+    "RAPIDJSON_BUILD_CXX11 Off"
+    "RAPIDJSON_BUILD_CXX17 On"
 )
 if(rapidjson_ADDED)
   add_library(rapidjson INTERFACE IMPORTED)
@@ -37,6 +43,11 @@ CPMAddPackage(
   VERSION 1.7.0
   GITHUB_REPOSITORY gabime/spdlog
 )
+
+#Set new timestamps
+cmake_policy(SET CMP0135 NEW)
+
+set(CMAKE_POLICY_DEFAULT_CMP0135 NEW)
 
 # ranges
 CPMAddPackage(

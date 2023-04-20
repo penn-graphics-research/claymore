@@ -12,9 +12,8 @@ project(Mn
 #Fixes https://gitlab.kitware.com/cmake/cmake/-/issues/24154 for older cmake versions
 set(CMAKE_INCLUDE_SYSTEM_FLAG_CUDA "-isystem ")
 
-#Temporarly suppresses error (till fixed)
-#https://github.com/google/googletest/pull/1792 causes issue in rapidjson relying on older version of gtest
-string(APPEND CMAKE_CXX_FLAGS " /wd5046")
+#Disable warnings for missing architectures. Setting architectures does cause link errors
+cmake_policy(SET CMP0104 OLD)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/CMake)
 option(BUILD_SHARED_LIBS "Enable compilation of shared libraries" OFF)

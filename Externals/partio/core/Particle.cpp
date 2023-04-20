@@ -391,7 +391,7 @@ computeClustering(ParticlesDataMutable* particles, const int numNeighbors,const 
         std::sort(++idAndIndex.begin(), idAndIndex.end());
 
         std::vector<std::pair<ParticleIndex,float> > originalPoint;
-        originalPoint.push_back(std::make_pair(cluster->addParticle(),0));
+        originalPoint.push_back(std::make_pair(cluster->addParticle(),0.0f));
         int clusterId = 0;
         cluster->dataWrite<int>(clusterIdAttr,originalPoint.back().first)[0] = clusterId++;
         for (size_t j = 0; j < attributes.size(); j++) {
@@ -419,7 +419,7 @@ computeClustering(ParticlesDataMutable* particles, const int numNeighbors,const 
             for (int j = 0; j < numInstances; j++) {
                 hashArgs[1] = idAndIndex[i]._id;
                 hashArgs[2] = j;
-                indexAndInterp.push_back(std::make_pair(cluster->addParticle(),hash(3,hashArgs)));
+                indexAndInterp.push_back(std::make_pair(cluster->addParticle(),static_cast<float>(hash(3,hashArgs))));
                 cluster->dataWrite<int>(clusterIdAttr,indexAndInterp.back().first)[0] = clusterId++;
             }
             for (size_t j = 0; j < attributes.size(); j++) {
