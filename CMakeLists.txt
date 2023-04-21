@@ -12,9 +12,6 @@ project(Mn
 #Fixes https://gitlab.kitware.com/cmake/cmake/-/issues/24154 for older cmake versions
 set(CMAKE_INCLUDE_SYSTEM_FLAG_CUDA "-isystem ")
 
-#Disable warnings for missing architectures. Setting architectures does cause link errors
-cmake_policy(SET CMP0104 OLD)
-
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/CMake)
 option(BUILD_SHARED_LIBS "Enable compilation of shared libraries" OFF)
 include(setup_cpp.cmake)

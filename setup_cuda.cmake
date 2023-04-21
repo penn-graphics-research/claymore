@@ -9,8 +9,7 @@ else()
 endif()
 set(CUDA_FOUND ${CMAKE_CUDA_COMPILER})
 
-# reference: http://arnon.dk/matching-sm-architectures-arch-and-gencode-for-various-nvidia-cards/
-set(TARGET_CUDA_ARCH -arch=native)
+set(CMAKE_CUDA_ARCHITECTURES native)
 
 # reference: https://cliutils.gitlab.io/modern-cmake/chapters/packages/CUDA.html
 function(CUDA_CONVERT_FLAGS EXISTING_TARGET)
@@ -23,23 +22,37 @@ function(CUDA_CONVERT_FLAGS EXISTING_TARGET)
     endif()
 endfunction()
 
+#Cmake does not handle linking correctly for separable compilation: https://gitlab.kitware.com/cmake/cmake/-/issues/22788
+function(GET_DEVICE_LINK_PATH TARGET_NAME ret)
+	cmake_path(SET DEVICE_LINK_PATH ${CMAKE_BINARY_DIR})
+	cmake_path(APPEND DEVICE_LINK_PATH "CMakeFiles")
+	cmake_path(APPEND DEVICE_LINK_PATH ${TARGET_NAME}.dir)
+	cmake_path(APPEND DEVICE_LINK_PATH ${CMAKE_BUILD_TYPE})
+	cmake_path(APPEND DEVICE_LINK_PATH "cmake_device_link.obj")
+	set(${ret} ${DEVICE_LINK_PATH} PARENT_SCOPE)
+endfunction()
+
 function(add_cuda_executable binary)
   if(CUDA_FOUND)
     add_executable(${binary} ${ARGN})
     # seems not working
     target_compile_options(${binary} 
-      PRIVATE     $<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CUDA>>:-g> ${TARGET_CUDA_ARCH} --expt-extended-lambda --expt-relaxed-constexpr --default-stream=per-thread --use_fast_math -lineinfo --ptxas-options=-allow-expensive-optimizations=true>
+      PRIVATE     $<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CUDA>>:-g> --expt-extended-lambda --expt-relaxed-constexpr --default-stream=per-thread --use_fast_math -lineinfo --ptxas-options=-allow-expensive-optimizations=true>
     )
     target_compile_features(${binary} PRIVATE cuda_std_17)
     set_target_properties(${binary}
       PROPERTIES  CUDA_EXTENSIONS ON
-                  CUDA_SEPARABLE_COMPILATION ON
+                  CUDA_SEPARABLE_COMPILATION OFF
                   #LINKER_LANGUAGE CUDA
                   RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
+	GET_DEVICE_LINK_PATH(${binary} DEVICE_LINK_PATH)
     target_link_libraries(${binary}
         PRIVATE mncuda
     )
+	target_link_options(${binary}
+		PRIVATE /NODEFAULTLIB:libcmt.lib
+	)
 	install(TARGETS
 		${binary}
 	)
@@ -52,7 +65,7 @@ function(add_cuda_library library)
     add_library(${library} ${ARGN})
     # seems not working
     target_compile_options(${library} 
-      PUBLIC        $<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CUDA>>:-g> ${TARGET_CUDA_ARCH} --expt-extended-lambda --expt-relaxed-constexpr --default-stream=per-thread --use_fast_math -lineinfo --ptxas-options=-allow-expensive-optimizations=true>
+      PUBLIC        $<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CUDA>>:-g> --expt-extended-lambda --expt-relaxed-constexpr --default-stream=per-thread --use_fast_math -lineinfo --ptxas-options=-allow-expensive-optimizations=true>
     )
     #target_link_options(${library} 
     #  PRIVATE       $<$<LINKER_LANGUAGE:CUDA>:-arch=sm_75>
@@ -60,7 +73,7 @@ function(add_cuda_library library)
     target_compile_features(${library} PRIVATE cuda_std_17)
     set_target_properties(${library}
       PROPERTIES  CUDA_EXTENSIONS ON
-                  CUDA_SEPARABLE_COMPILATION ON
+                  CUDA_SEPARABLE_COMPILATION OFF
                   CUDA_RESOLVE_DEVICE_SYMBOLS OFF
                   POSITION_INDEPENDENT_CODE ON
                   #LINKER_LANGUAGE CUDA

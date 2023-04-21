@@ -48,7 +48,7 @@ namespace config {
 	// background_grid
 	constexpr int BLOCK_BITS	= 2;
 	constexpr int DOMAIN_BITS	= 8;
-	constexpr float DXINV		= (1.0f * (1u << DOMAIN_BITS));
+	constexpr float DXINV		= (1.0f * (1 << DOMAIN_BITS));
 	constexpr int G_DOMAIN_BITS = DOMAIN_BITS;
 	constexpr int G_DOMAIN_SIZE = (1 << DOMAIN_BITS);
 	constexpr float G_BC		= 2.0;

@@ -245,7 +245,7 @@ __global__ void array_to_buffer(ParticleArray parray, ParticleBuffer<MaterialE::
 
 template<typename Grid, typename Partition>
 __global__ void update_grid_velocity_query_max(uint32_t block_count, Grid grid, Partition partition, float dt, float* max_vel) {
-	const int bc				   = static_cast<int>(std::lround(config::G_BC));
+	const int bc				   = static_cast<int>(std::floor(config::G_BC));
 	constexpr int NUM_WARPS		   = config::G_NUM_GRID_BLOCKS_PER_CUDA_BLOCK * config::G_NUM_WARPS_PER_GRID_BLOCK;
 	constexpr unsigned ACTIVE_MASK = 0xffffffff;
 	//__shared__ float sh_maxvels[config::G_BLOCKVOLUME * config::G_NUM_GRID_BLOCKS_PER_CUDA_BLOCK
@@ -322,7 +322,7 @@ __global__ void update_grid_velocity_query_max(uint32_t block_count, Grid grid, 
 
 template<typename Grid, typename Partition, typename Boundary>
 __global__ void update_grid_velocity_query_max(uint32_t block_count, Grid grid, Partition partition, float dt, Boundary boundary, float* max_vel) {
-	const int bc				   = static_cast<int>(std::lround(config::G_BC));
+	const int bc				   = static_cast<int>(std::floor(config::G_BC));
 	constexpr int NUM_WARPS		   = config::G_NUM_GRID_BLOCKS_PER_CUDA_BLOCK * config::G_NUM_WARPS_PER_GRID_BLOCK;
 	constexpr unsigned ACTIVE_MASK = 0xffffffff;
 	//__shared__ float sh_maxvels[config::G_BLOCKVOLUME * config::G_NUM_GRID_BLOCKS_PER_CUDA_BLOCK
@@ -505,7 +505,7 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 		vec3x3 dws;
 #pragma unroll 3
 		for(int dd = 0; dd < 3; ++dd) {
-			float d	   = (local_pos[dd] - static_cast<float>(std::lround(local_pos[dd] * config::G_DX_INV + 0.5f) - 1) * config::G_DX) * config::G_DX_INV;
+			float d	   = (local_pos[dd] - static_cast<float>(std::floor(local_pos[dd] * config::G_DX_INV + 0.5f) - 1) * config::G_DX) * config::G_DX_INV;
 			dws(dd, 0) = 0.5f * (1.5f - d) * (1.5f - d);
 			d -= 1.0f;
 			dws(dd, 1)			 = 0.75f - d * d;
@@ -582,7 +582,7 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 #pragma unroll 3
 		for(char dd = 0; dd < 3; ++dd) {
 			local_pos[dd] = pos[dd] - static_cast<float>(local_base_index[dd]) * config::G_DX;
-			float d		  = (local_pos[dd] - static_cast<float>(std::lround(local_pos[dd] * config::G_DX_INV + 0.5f) - 1) * config::G_DX) * config::G_DX_INV;
+			float d		  = (local_pos[dd] - static_cast<float>(std::floor(local_pos[dd] * config::G_DX_INV + 0.5f) - 1) * config::G_DX) * config::G_DX_INV;
 			dws(dd, 0)	  = 0.5f * (1.5f - d) * (1.5f - d);
 			d -= 1.0f;
 			dws(dd, 1) = 0.75f - d * d;
@@ -745,7 +745,7 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 		vec3x3 dws;
 #pragma unroll 3
 		for(int dd = 0; dd < 3; ++dd) {
-			float d	   = (local_pos[dd] - static_cast<float>(std::lround(local_pos[dd] * config::G_DX_INV + 0.5f) - 1) * config::G_DX) * config::G_DX_INV;
+			float d	   = (local_pos[dd] - static_cast<float>(std::floor(local_pos[dd] * config::G_DX_INV + 0.5f) - 1) * config::G_DX) * config::G_DX_INV;
 			dws(dd, 0) = 0.5f * (1.5f - d) * (1.5f - d);
 			d -= 1.0f;
 			dws(dd, 1)			 = 0.75f - d * d;
@@ -829,7 +829,7 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 #pragma unroll 3
 		for(char dd = 0; dd < 3; ++dd) {
 			local_pos[dd] = pos[dd] - static_cast<float>(local_base_index[dd]) * config::G_DX;
-			float d		  = (local_pos[dd] - static_cast<float>(std::lround(local_pos[dd] * config::G_DX_INV + 0.5f) - 1) * config::G_DX) * config::G_DX_INV;
+			float d		  = (local_pos[dd] - static_cast<float>(std::floor(local_pos[dd] * config::G_DX_INV + 0.5f) - 1) * config::G_DX) * config::G_DX_INV;
 			dws(dd, 0)	  = 0.5f * (1.5f - d) * (1.5f - d);
 			d -= 1.0f;
 			dws(dd, 1) = 0.75f - d * d;
@@ -990,7 +990,7 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 		vec3x3 dws;
 #pragma unroll 3
 		for(int dd = 0; dd < 3; ++dd) {
-			float d	   = (local_pos[dd] - static_cast<float>(std::lround(local_pos[dd] * config::G_DX_INV + 0.5f) - 1) * config::G_DX) * config::G_DX_INV;
+			float d	   = (local_pos[dd] - static_cast<float>(std::floor(local_pos[dd] * config::G_DX_INV + 0.5f) - 1) * config::G_DX) * config::G_DX_INV;
 			dws(dd, 0) = 0.5f * (1.5f - d) * (1.5f - d);
 			d -= 1.0f;
 			dws(dd, 1)			 = 0.75f - d * d;
@@ -1079,7 +1079,7 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 #pragma unroll 3
 		for(char dd = 0; dd < 3; ++dd) {
 			local_pos[dd] = pos[dd] - static_cast<float>(local_base_index[dd]) * config::G_DX;
-			float d		  = (local_pos[dd] - static_cast<float>(std::lround(local_pos[dd] * config::G_DX_INV + 0.5f) - 1) * config::G_DX) * config::G_DX_INV;
+			float d		  = (local_pos[dd] - static_cast<float>(std::floor(local_pos[dd] * config::G_DX_INV + 0.5f) - 1) * config::G_DX) * config::G_DX_INV;
 			dws(dd, 0)	  = 0.5f * (1.5f - d) * (1.5f - d);
 			d -= 1.0f;
 			dws(dd, 1) = 0.75f - d * d;
@@ -1241,7 +1241,7 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 		vec3x3 dws;
 #pragma unroll 3
 		for(int dd = 0; dd < 3; ++dd) {
-			float d	   = (local_pos[dd] - static_cast<float>(std::lround(local_pos[dd] * config::G_DX_INV + 0.5f) - 1) * config::G_DX) * config::G_DX_INV;
+			float d	   = (local_pos[dd] - static_cast<float>(std::floor(local_pos[dd] * config::G_DX_INV + 0.5f) - 1) * config::G_DX) * config::G_DX_INV;
 			dws(dd, 0) = 0.5f * (1.5f - d) * (1.5f - d);
 			d -= 1.0f;
 			dws(dd, 1)			 = 0.75f - d * d;
@@ -1330,7 +1330,7 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 #pragma unroll 3
 		for(char dd = 0; dd < 3; ++dd) {
 			local_pos[dd] = pos[dd] - static_cast<float>(local_base_index[dd]) * config::G_DX;
-			float d		  = (local_pos[dd] - static_cast<float>(std::lround(local_pos[dd] * config::G_DX_INV + 0.5f) - 1) * config::G_DX) * config::G_DX_INV;
+			float d		  = (local_pos[dd] - static_cast<float>(std::floor(local_pos[dd] * config::G_DX_INV + 0.5f) - 1) * config::G_DX) * config::G_DX_INV;
 			dws(dd, 0)	  = 0.5f * (1.5f - d) * (1.5f - d);
 			d -= 1.0f;
 			dws(dd, 1) = 0.75f - d * d;
