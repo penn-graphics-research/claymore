@@ -292,6 +292,12 @@ __global__ void update_grid_velocity_query_max(uint32_t block_count, Grid grid, 
 				grid_block.val_1d(_3, cidib) = vel[2];
 				vel_sqr += vel[2] * vel[2];
 			}
+			
+			//If we have nan values, signalize failure by setting max_vel to inf
+			if(isnan(vel_sqr)){
+				vel_sqr = std::numeric_limits<float>::infinity();
+			}
+			
 			// unsigned activeMask = __ballot_sync(0xffffffff, mv[0] != 0.0f);
 			for(int iter = 1; iter % 32; iter <<= 1) {
 				float tmp = __shfl_down_sync(ACTIVE_MASK, vel_sqr, iter, 32);

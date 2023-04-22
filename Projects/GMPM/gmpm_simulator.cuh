@@ -321,6 +321,13 @@ struct GmpmSimulator {
 				float max_vel = max_vels;
 				// if (max_vels > max_vel)
 				//  max_vel = max_vels[id];
+			
+				//If our maximum velocity is infinity our computation will crash, so we stop here.
+				if(std::isinf(max_vel)){
+					std::cout << "Maximum velocity is infinity" << std::endl;
+					goto outer_loop_end;
+				}
+			
 				max_vel = std::sqrt(max_vel);// this is a bug, should insert this line
 				next_dt = compute_dt(max_vel, cur_time, next_time, dt_default);
 				fmt::print(fmt::emphasis::bold, "{} --{}--> {}, defaultDt: {}, max_vel: {}\n", cur_time, next_dt, next_time, dt_default, max_vel);
@@ -473,6 +480,8 @@ struct GmpmSimulator {
 				"-----\n"
 			);
 		}
+		outer_loop_end:
+		(void) nullptr;//We need a statement to have a valid jump label
 	}
 	//NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic, readability-magic-numbers)
 
