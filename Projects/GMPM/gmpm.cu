@@ -25,8 +25,8 @@ const std::array K_TYPE_NAMES {"Null", "False", "True", "Object", "Array", "Stri
 // cube256_2.bin, 1048576
 // two_dragons.bin, 388950
 
-decltype(auto) load_model(std::size_t pcnt, const std::string& filename) {
-	std::vector<std::array<float, mn::config::NUM_DIMENSIONS>> rawpos(pcnt);
+decltype(auto) load_model(std::size_t particle_counts, const std::string& filename) {
+	std::vector<std::array<float, mn::config::NUM_DIMENSIONS>> rawpos(particle_counts);
 	auto addr_str = std::string(AssetDirPath) + "MpmParticles/";
 	FILE* f;
 	fopen_s(&f, (addr_str + filename).c_str(), "rb");
@@ -183,11 +183,11 @@ int main(int argc, char* argv[]) {
 
 	constexpr auto LEN		 = 46;
 	constexpr auto STRIDE	 = 56;
-	constexpr auto MODEL_CNT = 3;
+	constexpr auto MODEL_COUNT = 3;
 	for(int did = 0; did < 2; ++did) {
 		std::vector<std::array<float, 3>> model;
-		for(int i = 0; i < MODEL_CNT; ++i) {
-			auto idx = (did * MODEL_CNT + i);
+		for(int i = 0; i < MODEL_COUNT; ++i) {
+			auto idx = (did * MODEL_COUNT + i);
 			model	 = sample_uniform_box(
 				   gdx,
 				   ivec3 {18 + (idx & 1 ? STRIDE : 0), 18, 18},

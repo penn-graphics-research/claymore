@@ -43,11 +43,12 @@ __global__ void set_inverse(int num, const IndexType* map, IndexType* map_inv) {
 
 template<typename CounterType, typename IndexType>
 __global__ void exclusive_scan_inverse(CounterType num, const IndexType* map, IndexType* map_inv) {
-	uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 	if(idx >= num) {
 		return;
 	}
-	auto map_idx = map[idx];
+	
+	const auto map_idx = map[idx];
 	if(map_idx != map[idx + 1]) {
 		map_inv[map_idx] = idx;
 	}

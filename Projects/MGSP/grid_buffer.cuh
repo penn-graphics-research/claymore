@@ -30,9 +30,9 @@ struct GridBuffer : Instance<grid_buffer_> {
 			resize(capacity, capacity);
 	}
 	template<typename CudaContext>
-	void reset(int block_cnt, CudaContext& cu_dev) {
-		//check_cuda_errors(cudaMemsetAsync((void *)&this->val_1d(_0, 0), 0, grid_block_::size * block_cnt, cu_dev.stream_compute()));
-		cu_dev.compute_launch({block_cnt, config::G_BLOCKVOLUME}, clear_grid, *this);
+	void reset(int block_count, CudaContext& cu_dev) {
+		//check_cuda_errors(cudaMemsetAsync((void *)&this->val_1d(_0, 0), 0, grid_block_::size * block_count, cu_dev.stream_compute()));
+		cu_dev.compute_launch({block_count, config::G_BLOCKVOLUME}, clear_grid, *this);
 	}
 };
 

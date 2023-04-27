@@ -58,7 +58,7 @@ auto read_sdf(const std::string& fn, float ppc, float dx, vec<float, 3> offset, 
 		// particle[2] = ((samples[i * 3 + 2]) + offset[2]);
 		data.push_back(std::array<float, 3> {p[0], p[1], p[2]});
 	}
-	printf("[%f, %f, %f] - [%f, %f, %f], scale %f, parcnt %d, lsdx %f, dx %f\n", mins[0], mins[1], mins[2], maxs[0], maxs[1], maxs[2], scale, (int) data.size(), levelsetDx, dx);
+	printf("[%f, %f, %f] - [%f, %f, %f], scale %f, parcount %d, lsdx %f, dx %f\n", mins[0], mins[1], mins[2], maxs[0], maxs[1], maxs[2], scale, (int) data.size(), levelsetDx, dx);
 	return data;
 }
 
@@ -92,7 +92,7 @@ auto read_sdf(const std::string& fn, float ppc, float dx, int domainsize, vec<fl
 		p = (p - mins) * scale + offset;
 		data.push_back(std::array<float, 3> {p[0], p[1], p[2]});
 	}
-	printf("[%f, %f, %f] - [%f, %f, %f], scale %f, parcnt %d, lsdx %f, dx %f\n", mins[0], mins[1], mins[2], maxs[0], maxs[1], maxs[2], scale, (int) data.size(), levelsetDx, dx);
+	printf("[%f, %f, %f] - [%f, %f, %f], scale %f, parcount %d, lsdx %f, dx %f\n", mins[0], mins[1], mins[2], maxs[0], maxs[1], maxs[2], scale, (int) data.size(), levelsetDx, dx);
 	return data;
 }
 

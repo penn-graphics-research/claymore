@@ -41,21 +41,21 @@ struct ParticleBufferImpl : Instance<particle_buffer_<particle_bin_<Mt>>> {
 	using base_t							 = Instance<particle_buffer_<particle_bin_<Mt>>>;
 
 	std::size_t num_active_blocks;
-	int* ppcs;
-	int* ppbs;
+	int* cell_particle_counts;
+	int* particle_bucket_sizes;
 	int* cellbuckets;
 	int* blockbuckets;
-	int* binsts;
+	int* bin_offsets;
 
 	template<typename Allocator>
 	explicit ParticleBufferImpl(Allocator allocator)
 		: base_t {spawn<particle_buffer_<particle_bin_<Mt>>, orphan_signature>(allocator)}
 		, num_active_blocks()
-		, ppcs(nullptr)
-		, ppbs(nullptr)
+		, cell_particle_counts(nullptr)
+		, particle_bucket_sizes(nullptr)
 		, cellbuckets(nullptr)
 		, blockbuckets(nullptr)
-		, binsts(nullptr) {}
+		, bin_offsets(nullptr) {}
 
 	template<typename Allocator>
 	void check_capacity(Allocator allocator, std::size_t capacity) {

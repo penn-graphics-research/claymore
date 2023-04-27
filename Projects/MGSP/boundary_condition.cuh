@@ -136,7 +136,7 @@ struct SignedDistanceGrid : Instance<signed_distance_field_> {
 		return sdis_res;
 	}
 	__forceinline__ __device__ bool query_sdf(vec3& normal, const vec3& x) {
-		if(x[0] < config::G_BC * config::G_DX * config::G_BLOCKSIZE || x[0] >= (GridDomain::range(_0) - config::G_BC) * config::G_BLOCKSIZE * config::G_DX || x[1] < config::G_BC * config::G_DX * config::G_BLOCKSIZE || x[1] >= (GridDomain::range(_1) - config::G_BC) * config::G_BLOCKSIZE * config::G_DX || x[2] < config::G_BC * config::G_DX * config::G_BLOCKSIZE || x[2] >= (GridDomain::range(_2) - config::G_BC) * config::G_BLOCKSIZE * config::G_DX) {
+		if(x[0] < config::G_BOUNDARY_CONDITION * config::G_DX * config::G_BLOCKSIZE || x[0] >= (GridDomain::range(_0) - config::G_BOUNDARY_CONDITION) * config::G_BLOCKSIZE * config::G_DX || x[1] < config::G_BOUNDARY_CONDITION * config::G_DX * config::G_BLOCKSIZE || x[1] >= (GridDomain::range(_1) - config::G_BOUNDARY_CONDITION) * config::G_BLOCKSIZE * config::G_DX || x[2] < config::G_BOUNDARY_CONDITION * config::G_DX * config::G_BLOCKSIZE || x[2] >= (GridDomain::range(_2) - config::G_BOUNDARY_CONDITION) * config::G_BLOCKSIZE * config::G_DX) {
 			return false;
 		}
 		return get_signed_distance_and_normal(x, normal) <= 0.f;

@@ -52,11 +52,11 @@ struct HaloGridBlocks {
 		check_cuda_errors(cudaMemcpyAsync(h_counts.data(), counts, sizeof(uint32_t) * num_targets, cudaMemcpyDefault, stream));
 	}
 	void send(HaloGridBlocks& other, int src, int dst, cudaStream_t stream) {
-		auto cnt = other.h_counts[src] = h_counts[dst];
-		//check_cuda_errors(cudaMemcpyAsync( &other.buffers[src].val(_1, 0), &buffers[dst].val(_1, 0), sizeof(ivec3) * cnt, cudaMemcpyDefault, stream));
-		check_cuda_errors(cudaMemcpyAsync(other.buffers[src].blockids, buffers[dst].blockids, sizeof(ivec3) * cnt, cudaMemcpyDefault, stream));
-		//check_cuda_errors(cudaMemcpyAsync(&other.buffers[src].grid.ch(_0, 0).val_1d(_0, 0), &buffers[dst].grid.ch(_0, 0).val_1d(_0, 0), grid_block_::size * cnt, cudaMemcpyDefault, stream));
-		check_cuda_errors(cudaMemcpyPeerAsync(&other.buffers[src].grid.ch(_0, 0).val_1d(_0, 0), dst, &buffers[dst].grid.ch(_0, 0).val_1d(_0, 0), src, grid_block_::size * cnt, stream));
+		auto count = other.h_counts[src] = h_counts[dst];
+		//check_cuda_errors(cudaMemcpyAsync( &other.buffers[src].val(_1, 0), &buffers[dst].val(_1, 0), sizeof(ivec3) * count, cudaMemcpyDefault, stream));
+		check_cuda_errors(cudaMemcpyAsync(other.buffers[src].blockids, buffers[dst].blockids, sizeof(ivec3) * count, cudaMemcpyDefault, stream));
+		//check_cuda_errors(cudaMemcpyAsync(&other.buffers[src].grid.ch(_0, 0).val_1d(_0, 0), &buffers[dst].grid.ch(_0, 0).val_1d(_0, 0), grid_block_::size * count, cudaMemcpyDefault, stream));
+		check_cuda_errors(cudaMemcpyPeerAsync(&other.buffers[src].grid.ch(_0, 0).val_1d(_0, 0), dst, &buffers[dst].grid.ch(_0, 0).val_1d(_0, 0), src, grid_block_::size * count, stream));
 		// printf("sending from %d to %d at %llu\n", src, dst,
 		//       (unsigned long long)&other.buffers[src].grid.ch(_0, 0).val_1d(_0,
 		//       0));

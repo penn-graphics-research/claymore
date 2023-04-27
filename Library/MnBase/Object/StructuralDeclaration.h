@@ -193,15 +193,15 @@ struct Structural<StructuralType::HASH, Decoration, Domain, Layout, Structurals.
 
 	// data members
 	value_t capacity;
-	value_t* cnt;
+	value_t* count;
 	key_t* active_keys;	 //
 	value_t* index_table;//
 
 	// func members
 	template<typename Allocator>
 	void allocate_table(Allocator allocator, value_t capacity) {
-		capacity	= capacity;
-		cnt			= static_cast<value_t*>(allocator.allocate(sizeof(value_t)));
+		this->capacity	= capacity;
+		count			= static_cast<value_t*>(allocator.allocate(sizeof(value_t)));
 		active_keys = static_cast<key_t*>(allocator.allocate(sizeof(key_t) * capacity));
 		/// lookup table
 		index_table = static_cast<value_t*>(allocator.allocate(sizeof(value_t) * Domain::extent));
@@ -211,21 +211,22 @@ struct Structural<StructuralType::HASH, Decoration, Domain, Layout, Structurals.
 	void resize_table(Allocator allocator, std::size_t capacity) {
 		allocator.deallocate(active_keys, capacity);
 		active_keys = static_cast<key_t*>(allocator.allocate(sizeof(key_t) * capacity));
-		capacity	= capacity;
+		this->capacity	= capacity;
 	}
 
 	template<typename Allocator>
 	void deallocate(Allocator allocator) {
-		allocator.deallocate(cnt, sizeof(value_t));
+		allocator.deallocate(count, sizeof(value_t));
 		allocator.deallocate(active_keys, sizeof(key_t) * capacity);
 		allocator.deallocate(index_table, sizeof(value_t) * Domain::extent);
 		base_t::deallocate(allocator);
 		capacity	= 0;
-		cnt			= nullptr;
+		count			= nullptr;
 		active_keys = nullptr;
 		index_table = nullptr;
 	}
 
+	//TODO: Add (optional) range checks here (and maybe elsewhere too)
 	template<typename... Indices>
 	constexpr auto& val(Indices&&... indices) {
 		return *static_cast<value_t*>(static_cast<void*>(index_table + Domain::offset(std::forward<Indices>(indices)...)));
@@ -276,20 +277,20 @@ struct Structural<StructuralType::DYNAMIC, Decoration, Domain, Layout, Structura
 		} else {
 			this->handle.ptr = nullptr;
 		}
-		capacity = capacity;
+		this->capacity = capacity;
 	}
 
 	template<typename Allocator>
 	void resize(Allocator allocator, std::size_t capacity) {
 		allocator.deallocate(this->handle.ptr, capacity);
-		capacity		 = capacity;///< each time multiply by 2
+		this->capacity		 = capacity;///< each time multiply by 2
 		this->handle.ptr = allocator.allocate(capacity * base_t::element_storage_size);
 	}
 
 	template<typename Allocator>
 	void deallocate(Allocator allocator) {
 		allocator.deallocate(this->handle.ptr, capacity * base_t::element_storage_size);
-		capacity		 = 0;
+		this->capacity		 = 0;
 		this->handle.ptr = nullptr;
 	}
 };

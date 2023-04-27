@@ -11,37 +11,37 @@ namespace mn {
 template<int>
 struct HaloPartition {
 	template<typename Allocator>
-	HaloPartition(Allocator allocator, int max_block_cnt) {
+	HaloPartition(Allocator allocator, int max_block_count) {
 		(void) allocator;
-		(void) max_block_cnt;
+		(void) max_block_count;
 	}
 
 	template<typename Allocator>
 	void resize_partition(Allocator allocator, std::size_t prev_capacity, std::size_t capacity) {}
-	void copy_to(HaloPartition& other, std::size_t block_cnt, cudaStream_t stream) {}
+	void copy_to(HaloPartition& other, std::size_t block_count, cudaStream_t stream) {}
 };
 template<>
 struct HaloPartition<1> {
-	int* count;
+	int* halo_count;
 	int h_count;
 	char* halo_marks;///< halo particle blocks
 	int* overlap_marks;
 	ivec3* halo_blocks;
 
 	template<typename Allocator>
-	HaloPartition(Allocator allocator, int max_block_cnt)
+	HaloPartition(Allocator allocator, int max_block_count)
 		: h_count(0) {
-		count		  = static_cast<int*>(allocator.allocate(sizeof(char) * max_block_cnt));
-		halo_marks	  = static_cast<char*>(allocator.allocate(sizeof(char) * max_block_cnt));
-		overlap_marks = static_cast<int*>(allocator.allocate(sizeof(int) * max_block_cnt));
-		halo_blocks	  = static_cast<ivec3*>(allocator.allocate(sizeof(ivec3) * max_block_cnt));
+		halo_count		  = static_cast<int*>(allocator.allocate(sizeof(char) * max_block_count));
+		halo_marks	  = static_cast<char*>(allocator.allocate(sizeof(char) * max_block_count));
+		overlap_marks = static_cast<int*>(allocator.allocate(sizeof(int) * max_block_count));
+		halo_blocks	  = static_cast<ivec3*>(allocator.allocate(sizeof(ivec3) * max_block_count));
 	}
 
-	void copy_to(HaloPartition& other, std::size_t block_cnt, cudaStream_t stream) const {
+	void copy_to(HaloPartition& other, std::size_t block_count, cudaStream_t stream) const {
 		other.h_count = h_count;
-		check_cuda_errors(cudaMemcpyAsync(other.halo_marks, halo_marks, sizeof(char) * block_cnt, cudaMemcpyDefault, stream));
-		check_cuda_errors(cudaMemcpyAsync(other.overlap_marks, overlap_marks, sizeof(int) * block_cnt, cudaMemcpyDefault, stream));
-		check_cuda_errors(cudaMemcpyAsync(other.halo_blocks, halo_blocks, sizeof(ivec3) * block_cnt, cudaMemcpyDefault, stream));
+		check_cuda_errors(cudaMemcpyAsync(other.halo_marks, halo_marks, sizeof(char) * block_count, cudaMemcpyDefault, stream));
+		check_cuda_errors(cudaMemcpyAsync(other.overlap_marks, overlap_marks, sizeof(int) * block_count, cudaMemcpyDefault, stream));
+		check_cuda_errors(cudaMemcpyAsync(other.halo_blocks, halo_blocks, sizeof(ivec3) * block_count, cudaMemcpyDefault, stream));
 	}
 
 	template<typename Allocator>
@@ -55,7 +55,7 @@ struct HaloPartition<1> {
 	}
 
 	void reset_halo_count(cudaStream_t stream) const {
-		check_cuda_errors(cudaMemsetAsync(count, 0, sizeof(int), stream));
+		check_cuda_errors(cudaMemsetAsync(halo_count, 0, sizeof(int), stream));
 	}
 
 	void reset_overlap_marks(uint32_t neighbor_block_count, cudaStream_t stream) const {
@@ -63,7 +63,7 @@ struct HaloPartition<1> {
 	}
 
 	void retrieve_halo_count(cudaStream_t stream) {
-		check_cuda_errors(cudaMemcpyAsync(&h_count, count, sizeof(int), cudaMemcpyDefault, stream));
+		check_cuda_errors(cudaMemcpyAsync(&h_count, halo_count, sizeof(int), cudaMemcpyDefault, stream));
 	}
 };
 
@@ -83,9 +83,9 @@ struct Partition
 	static_assert(sentinel_v == (value_t) (-1), "sentinel value not full 1s\n");
 
 	template<typename Allocator>
-	Partition(Allocator allocator, int max_block_cnt)
-		: halo_base_t {allocator, max_block_cnt} {
-		allocate_table(allocator, max_block_cnt);
+	Partition(Allocator allocator, int max_block_count)
+		: halo_base_t {allocator, max_block_count} {
+		allocate_table(allocator, max_block_count);
 		/// init
 		reset();
 	}
@@ -104,20 +104,20 @@ struct Partition
 	}
 
 	void reset() {
-		check_cuda_errors(cudaMemset(this->cnt, 0, sizeof(value_t)));
+		check_cuda_errors(cudaMemset(this->Instance<block_partition_>::count, 0, sizeof(value_t)));
 		check_cuda_errors(cudaMemset(this->index_table, 0xff, sizeof(value_t) * domain::extent));
 	}
 	void reset_table(cudaStream_t stream) {
 		check_cuda_errors(cudaMemsetAsync(this->index_table, 0xff, sizeof(value_t) * domain::extent, stream));
 	}
-	void copy_to(Partition& other, std::size_t block_cnt, cudaStream_t stream) {
-		halo_base_t::copy_to(other, block_cnt, stream);
+	void copy_to(Partition& other, std::size_t block_count, cudaStream_t stream) {
+		halo_base_t::copy_to(other, block_count, stream);
 		check_cuda_errors(cudaMemcpyAsync(other.index_table, this->index_table, sizeof(value_t) * domain::extent, cudaMemcpyDefault, stream));
 	}
 	__forceinline__ __device__ value_t insert(key_t key) noexcept {
 		value_t tag = atomicCAS(&this->index(key), sentinel_v, 0);
 		if(tag == sentinel_v) {
-			value_t idx			   = atomicAdd(this->cnt, 1);
+			value_t idx			   = atomicAdd(this->Instance<block_partition_>::count, 1);
 			this->index(key)	   = idx;
 			this->active_keys[idx] = key;///< created a record
 			return idx;

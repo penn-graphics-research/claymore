@@ -5,6 +5,8 @@
 
 #include <array>
 
+#define PRINT_CELL_OVERFLOW 0//TODO: Move to another place
+
 namespace mn {
 
 using ivec3	   = vec<int, 3>;
@@ -26,7 +28,7 @@ enum class MaterialE {
 /// https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html, F.3.16.5
 /// benchmark setup
 namespace config {
-	constexpr int G_DEVICE_CNT = 1;
+	constexpr int G_DEVICE_COUNT = 1;
 	constexpr MaterialE get_material_type(int did) noexcept {
 		(void) did;
 
@@ -51,7 +53,7 @@ namespace config {
 	constexpr float DXINV		= (1.0f * (1 << DOMAIN_BITS));
 	constexpr int G_DOMAIN_BITS = DOMAIN_BITS;
 	constexpr int G_DOMAIN_SIZE = (1 << DOMAIN_BITS);
-	constexpr float G_BC		= 2.0;
+	constexpr float G_BOUNDARY_CONDITION		= 2.0;
 	constexpr float G_DX		= 1.f / DXINV;
 	constexpr float G_DX_INV	= DXINV;
 	constexpr float G_D_INV		= 4.f * DXINV * DXINV;
@@ -63,10 +65,10 @@ namespace config {
 	constexpr int G_GRID_SIZE	= (1 << (DOMAIN_BITS - BLOCK_BITS));
 
 	// particle
-	constexpr int MAX_PPC				   = 128;
-	constexpr int G_MAX_PPC				   = MAX_PPC;
+	constexpr int MAX_PARTICLES_IN_CELL				   = 128;
+	constexpr int G_MAX_PARTICLES_IN_CELL				   = MAX_PARTICLES_IN_CELL;
 	constexpr int G_BIN_CAPACITY		   = 32;
-	constexpr int G_PARTICLE_NUM_PER_BLOCK = (MAX_PPC * (1 << (BLOCK_BITS * 3)));
+	constexpr int G_PARTICLE_NUM_PER_BLOCK = (MAX_PARTICLES_IN_CELL * (1 << (BLOCK_BITS * 3)));
 
 	// material parameters
 	constexpr float DENSITY		   = 1e3;
@@ -80,7 +82,7 @@ namespace config {
 	constexpr int G_MAX_PARTICLE_NUM = 1000000;
 	constexpr int G_MAX_ACTIVE_BLOCK = 10000;/// 62500 bytes for active mask
 	constexpr std::size_t calc_particle_bin_count(std::size_t num_active_blocks) noexcept {
-		return num_active_blocks * (G_MAX_PPC * G_BLOCKVOLUME / G_BIN_CAPACITY);
+		return num_active_blocks * (G_MAX_PARTICLES_IN_CELL * G_BLOCKVOLUME / G_BIN_CAPACITY);
 	}
 	constexpr std::size_t G_MAX_PARTICLE_BIN = G_MAX_PARTICLE_NUM / G_BIN_CAPACITY;
 	constexpr std::size_t G_MAX_HALO_BLOCK	 = 4000;

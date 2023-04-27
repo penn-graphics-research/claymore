@@ -52,7 +52,7 @@ __global__ void collect_blockids_for_halo_reduction(uint32_t particle_block_coun
 				// if (partition.overlap_marks[neighborno] ^ ((HaloIndex)1 << did)) {
 				if(partition.overlap_marks[neighborno]) {
 					partition.halo_marks[blockno] = 1;
-					auto halono					  = atomicAdd(partition.count, 1);
+					auto halono					  = atomicAdd(partition.halo_count, 1);
 					partition.halo_blocks[halono] = blockid;
 					return;
 				}
@@ -71,11 +71,11 @@ __global__ void collect_grid_blocks(Grid grid, Partition partition, HaloGridBloc
 	auto halo_gridblock = halo_grid_blocks.grid.ch(_0, halo_blockno);
 	auto gridblock		= grid.ch(_0, blockno);
 
-	for(int cidib = static_cast<int>(threadIdx.x); cidib < config::G_BLOCKVOLUME; cidib += static_cast<int>(blockDim.x)) {
-		halo_gridblock.val_1d(_0, cidib) = gridblock.val_1d(_0, cidib);
-		halo_gridblock.val_1d(_1, cidib) = gridblock.val_1d(_1, cidib);
-		halo_gridblock.val_1d(_2, cidib) = gridblock.val_1d(_2, cidib);
-		halo_gridblock.val_1d(_3, cidib) = gridblock.val_1d(_3, cidib);
+	for(int cell_id_in_block = static_cast<int>(threadIdx.x); cell_id_in_block < config::G_BLOCKVOLUME; cell_id_in_block += static_cast<int>(blockDim.x)) {
+		halo_gridblock.val_1d(_0, cell_id_in_block) = gridblock.val_1d(_0, cell_id_in_block);
+		halo_gridblock.val_1d(_1, cell_id_in_block) = gridblock.val_1d(_1, cell_id_in_block);
+		halo_gridblock.val_1d(_2, cell_id_in_block) = gridblock.val_1d(_2, cell_id_in_block);
+		halo_gridblock.val_1d(_3, cell_id_in_block) = gridblock.val_1d(_3, cell_id_in_block);
 	}
 }
 
@@ -88,11 +88,11 @@ __global__ void reduce_grid_blocks(Grid grid, Partition partition, HaloGridBlock
 	auto halo_gridblock = halo_grid_blocks.grid.ch(_0, halo_blockno);
 	auto gridblock		= grid.ch(_0, blockno);
 
-	for(int cidib = static_cast<int>(threadIdx.x); cidib < config::G_BLOCKVOLUME; cidib += static_cast<int>(blockDim.x)) {
-		atomicAdd(&gridblock.val_1d(_0, cidib), halo_gridblock.val_1d(_0, cidib));
-		atomicAdd(&gridblock.val_1d(_1, cidib), halo_gridblock.val_1d(_1, cidib));
-		atomicAdd(&gridblock.val_1d(_2, cidib), halo_gridblock.val_1d(_2, cidib));
-		atomicAdd(&gridblock.val_1d(_3, cidib), halo_gridblock.val_1d(_3, cidib));
+	for(int cell_id_in_block = static_cast<int>(threadIdx.x); cell_id_in_block < config::G_BLOCKVOLUME; cell_id_in_block += static_cast<int>(blockDim.x)) {
+		atomicAdd(&gridblock.val_1d(_0, cell_id_in_block), halo_gridblock.val_1d(_0, cell_id_in_block));
+		atomicAdd(&gridblock.val_1d(_1, cell_id_in_block), halo_gridblock.val_1d(_1, cell_id_in_block));
+		atomicAdd(&gridblock.val_1d(_2, cell_id_in_block), halo_gridblock.val_1d(_2, cell_id_in_block));
+		atomicAdd(&gridblock.val_1d(_3, cell_id_in_block), halo_gridblock.val_1d(_3, cell_id_in_block));
 	}
 }
 
@@ -121,11 +121,11 @@ __global__ void collect_migration_grid_blocks(Grid grid, Partition partition, Ha
 	auto blockno   = partition.query(halo_blockid);
 	auto gridblock = grid.ch(_0, blockno);
 
-	for(int cidib = static_cast<int>(threadIdx.x); cidib < config::G_BLOCKVOLUME; cidib += static_cast<int>(blockDim.x)) {
-		halo_gridblock.val_1d(_0, cidib) = gridblock.val_1d(_0, cidib);
-		halo_gridblock.val_1d(_1, cidib) = gridblock.val_1d(_1, cidib);
-		halo_gridblock.val_1d(_2, cidib) = gridblock.val_1d(_2, cidib);
-		halo_gridblock.val_1d(_3, cidib) = gridblock.val_1d(_3, cidib);
+	for(int cell_id_in_block = static_cast<int>(threadIdx.x); cell_id_in_block < config::G_BLOCKVOLUME; cell_id_in_block += static_cast<int>(blockDim.x)) {
+		halo_gridblock.val_1d(_0, cell_id_in_block) = gridblock.val_1d(_0, cell_id_in_block);
+		halo_gridblock.val_1d(_1, cell_id_in_block) = gridblock.val_1d(_1, cell_id_in_block);
+		halo_gridblock.val_1d(_2, cell_id_in_block) = gridblock.val_1d(_2, cell_id_in_block);
+		halo_gridblock.val_1d(_3, cell_id_in_block) = gridblock.val_1d(_3, cell_id_in_block);
 	}
 }
 //NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic, readability-magic-numbers, misc-definitions-in-headers)

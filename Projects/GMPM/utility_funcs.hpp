@@ -4,7 +4,7 @@
 
 namespace mn {
 
-//TODO: Maybe create parameters fopr some of this magic numbers
+//TODO: Maybe create parameters for some of this magic numbers
 //NOLINTBEGIN(readability-magic-numbers) Magic numbers are formula-specific
 /// assume p is already within kernel range [-1.5, 1.5]
 constexpr vec3 bspline_weight(float p) {
@@ -16,6 +16,10 @@ constexpr vec3 bspline_weight(float p) {
 	d	  = 0.5f + d;
 	dw[2] = 0.5f * d * d;
 	return dw;
+}
+
+constexpr ivec3 get_block_id(const vec3& position){
+	return ivec3(static_cast<int>(std::lround(position[0] * config::G_DX_INV)), static_cast<int>(std::lround(position[1] * config::G_DX_INV)), static_cast<int>(std::lround(position[2] * config::G_DX_INV)));
 }
 
 constexpr int dir_offset(ivec3 d) {
@@ -30,26 +34,22 @@ constexpr void dir_components(int dir, ivec3& d) {
 
 //NOLINTBEGIN(readability-magic-numbers) Magic numbers are formula-specific
 constexpr float compute_dt(float max_vel, const float cur, const float next, const float dt_default) noexcept {
+	
+	//If our next time is smaller than our current time we don't step
 	if(next < cur) {
 		return 0.0f;
 	}
 
+	//Choose dt such that particles with maximum velocity cannot move more than 0.3 * G_DX
+	//TODO: Why 0.3?
 	float dt = dt_default;
 	if(max_vel > 0.0f) {
-		max_vel = config::G_DX * 0.3f / max_vel;
-		if(max_vel < dt_default) {
-			dt = max_vel;
-		}
+		const float new_dt = config::G_DX * 0.3f / max_vel;
+		dt = std::min(new_dt, dt);
 	}
-
-	if(cur + dt >= next) {
-		dt = next - cur;
-	} else {
-		max_vel = (next - cur) * 0.51f;
-		if(max_vel < dt) {
-			dt = max_vel;
-		}
-	}
+	
+	//If next time is smaller than time using dt, set dt to difference between current and next
+	dt = std::min(next - cur, dt);
 
 	return dt;
 }
