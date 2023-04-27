@@ -23,8 +23,9 @@ struct GridBuffer : Instance<grid_buffer_> {
 		
 	template<typename Allocator>
 	void check_capacity(Allocator allocator, std::size_t capacity) {
-		if(capacity > _capacity)
-			resize(capacity, capacity);
+		if(capacity > this->capacity){
+			this->resize(allocator, capacity);
+		}
 	}
 	
 	template<typename CudaContext>

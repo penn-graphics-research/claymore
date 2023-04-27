@@ -59,7 +59,7 @@ struct ParticleBufferImpl : Instance<particle_buffer_<particle_bin_<Mt>>> {
 
 	template<typename Allocator>
 	void check_capacity(Allocator allocator, std::size_t capacity) {
-		if(capacity > this->_capacity)
+		if(capacity > this->capacity)
 			this->resize(allocator, capacity);
 	}
 };

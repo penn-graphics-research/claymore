@@ -70,7 +70,7 @@ struct HashTable : public CudaAttribs<HashTableAttribList> {
 			}
 
 			template<typename RecoverKeyOp, typename KeyT = KT>
-			__forceinline__ __device__ void insert(KeyT&& key, KeyT* _records, RecoverKeyOp recover_op) {
+			__forceinline__ __device__ void insert(KeyT&& key, KeyT* records, RecoverKeyOp recover_op) {
 				KeyType hashkey = std::forward<KeyT>(key) & mask;
 				KeyType ori;
 
@@ -80,7 +80,7 @@ struct HashTable : public CudaAttribs<HashTableAttribList> {
 					}
 					if(key_table[hashkey] == std::forward<KeyT>(key)) {///< found
 						if(ori == SENTINEL_VALUE) {
-							_records[value_table[hashkey] = atomicAdd(entry_count, 1)] = recover_op(std::forward<KeyT>(key));///< created a record
+							records[value_table[hashkey] = atomicAdd(entry_count, 1)] = recover_op(std::forward<KeyT>(key));///< created a record
 						}
 						break;
 					}
