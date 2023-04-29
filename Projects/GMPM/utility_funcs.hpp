@@ -40,11 +40,11 @@ constexpr float compute_dt(float max_vel, const float cur, const float next, con
 		return 0.0f;
 	}
 
-	//Choose dt such that particles with maximum velocity cannot move more than 0.3 * G_DX
-	//TODO: Why 0.3?
+	//Choose dt such that particles with maximum velocity cannot move more than G_DX * CFL
+	//This ensures CFL condition is satisfied
 	float dt = dt_default;
 	if(max_vel > 0.0f) {
-		const float new_dt = config::G_DX * 0.3f / max_vel;
+		const float new_dt = config::G_DX * config::CFL / max_vel;
 		dt = std::min(new_dt, dt);
 	}
 	

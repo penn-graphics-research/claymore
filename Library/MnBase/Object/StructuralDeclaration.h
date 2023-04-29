@@ -209,7 +209,7 @@ struct Structural<StructuralType::HASH, Decoration, Domain, Layout, Structurals.
 
 	template<typename Allocator>
 	void resize_table(Allocator allocator, std::size_t capacity) {
-		allocator.deallocate(active_keys, capacity);
+		allocator.deallocate(active_keys, this->capacity);
 		active_keys = static_cast<key_t*>(allocator.allocate(sizeof(key_t) * capacity));
 		this->capacity	= capacity;
 	}
@@ -282,14 +282,14 @@ struct Structural<StructuralType::DYNAMIC, Decoration, Domain, Layout, Structura
 
 	template<typename Allocator>
 	void resize(Allocator allocator, std::size_t capacity) {
-		allocator.deallocate(this->handle.ptr, capacity);
+		allocator.deallocate(this->handle.ptr, this->capacity);
 		this->capacity		 = capacity;///< each time multiply by 2
 		this->handle.ptr = allocator.allocate(capacity * base_t::element_storage_size);
 	}
 
 	template<typename Allocator>
 	void deallocate(Allocator allocator) {
-		allocator.deallocate(this->handle.ptr, capacity * base_t::element_storage_size);
+		allocator.deallocate(this->handle.ptr, this->capacity * base_t::element_storage_size);
 		this->capacity		 = 0;
 		this->handle.ptr = nullptr;
 	}

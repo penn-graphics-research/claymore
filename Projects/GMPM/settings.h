@@ -43,14 +43,17 @@ namespace config {
 	constexpr int G_NUM_WARPS_PER_CUDA_BLOCK	   = GBPCB;
 	constexpr int G_PARTICLE_BATCH_CAPACITY		   = 128;
 
+	//FIXME: Ensure that this is the same as that of model file. Or directly use that one
 	constexpr float MODEL_PPC	= 8.0f;
 	constexpr float G_MODEL_PPC = MODEL_PPC;
 	constexpr float CFL			= 0.5f;
 
 	// background_grid
+	constexpr float GRID_BLOCK_SPACING = 1.0f;
+	
 	constexpr int BLOCK_BITS	= 2;
 	constexpr int DOMAIN_BITS	= 8;
-	constexpr float DXINV		= (1.0f * (1 << DOMAIN_BITS));
+	constexpr float DXINV		= (GRID_BLOCK_SPACING * (1 << DOMAIN_BITS));
 	constexpr int G_DOMAIN_BITS = DOMAIN_BITS;
 	constexpr int G_DOMAIN_SIZE = (1 << DOMAIN_BITS);
 	constexpr float G_BOUNDARY_CONDITION		= 2.0;
@@ -75,7 +78,7 @@ namespace config {
 	constexpr float YOUNGS_MODULUS = 5e3;
 	constexpr float POISSON_RATIO  = 0.4f;
 
-	//
+	//FIXME: Ensure that this is the same as that of model file. Or directly use that one
 	constexpr float G_GRAVITY = -9.8f;
 
 	/// only used on host

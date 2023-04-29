@@ -152,7 +152,7 @@ __global__ void register_exterior_blocks(uint32_t block_count, Partition partiti
 }
 
 template<typename Grid, typename Partition>
-__global__ void rasterize(uint32_t particle_counts, const ParticleArray particle_array, Grid grid, const Partition partition, float dt, float mass, vec3 v0) {
+__global__ void rasterize(uint32_t particle_counts, const ParticleArray particle_array, Grid grid, const Partition partition, float dt, float mass, std::array<float, 3> v0) {
 	const uint32_t particle_id = blockIdx.x * blockDim.x + threadIdx.x;
 	if(particle_id >= particle_counts) {
 		return;
@@ -160,7 +160,7 @@ __global__ void rasterize(uint32_t particle_counts, const ParticleArray particle
 
 	//Fetch particle position and velocity
 	const vec3 global_pos {particle_array.val(_0, particle_id), particle_array.val(_1, particle_id), particle_array.val(_2, particle_id)};
-	const vec3 vel = v0;
+	const vec3 vel {v0[0], v0[1], v0[2]};
 	
 	//vec9 contrib;
 	//vec9 c;
@@ -170,10 +170,10 @@ __global__ void rasterize(uint32_t particle_counts, const ParticleArray particle
 	//contrib = (c * mass - contrib * dt) * config::G_D_INV;
 	
 	//Calculate grid index
-	const ivec3 global_base_index = get_block_id(vel) - 1;
+	const ivec3 global_base_index = get_block_id(global_pos) - 1;
 	
 	//Calculate position relative to grid cell
-	const vec3 local_pos = vel - global_base_index * config::G_DX;
+	const vec3 local_pos = global_pos - global_base_index * config::G_DX;
 	
 	//Calc kernel
 	vec<vec3, 3> dws;
@@ -207,7 +207,7 @@ __global__ void rasterize(uint32_t particle_counts, const ParticleArray particle
 				//Fetch block number
 				const int blockno		  = partition.query(ivec3 {static_cast<int>(global_index[0] >> config::G_BLOCKBITS), static_cast<int>(global_index[1] >> config::G_BLOCKBITS), static_cast<int>(global_index[2] >> config::G_BLOCKBITS)});
 				
-				//Fetch griod block and initialize values
+				//Fetch grid block and initialize values
 				auto grid_block	  = grid.ch(_0, blockno);
 				atomicAdd(&grid_block.val(_0, global_index_masked[0], global_index_masked[1], global_index_masked[2]), wm);
 				atomicAdd(&grid_block.val(_1, global_index_masked[0], global_index_masked[1], global_index_masked[2]), wm * vel[0]);// + (contrib[0] * xixp[0] + contrib[3] * xixp[1] + contrib[6] * xixp[2]) * w);
@@ -288,7 +288,7 @@ __global__ void array_to_buffer(ParticleArray particle_array, ParticleBuffer<Mat
 		particle_bin.val(_9, particle_id_in_block % config::G_BIN_CAPACITY)  = 0.f;
 		particle_bin.val(_10, particle_id_in_block % config::G_BIN_CAPACITY) = 0.f;
 		particle_bin.val(_11, particle_id_in_block % config::G_BIN_CAPACITY) = 1.f;
-		/// logJp
+		/// log_jp
 		particle_bin.val(_12, particle_id_in_block % config::G_BIN_CAPACITY) = ParticleBuffer<MaterialE::SAND>::LOG_JP_0;
 	}
 }
@@ -317,7 +317,7 @@ __global__ void array_to_buffer(ParticleArray particle_array, ParticleBuffer<Mat
 		particle_bin.val(_9, particle_id_in_block % config::G_BIN_CAPACITY)  = 0.f;
 		particle_bin.val(_10, particle_id_in_block % config::G_BIN_CAPACITY) = 0.f;
 		particle_bin.val(_11, particle_id_in_block % config::G_BIN_CAPACITY) = 1.f;
-		/// logJp
+		/// log_jp
 		particle_bin.val(_12, particle_id_in_block % config::G_BIN_CAPACITY) = ParticleBuffer<MaterialE::NACC>::LOG_JP_0;
 	}
 }
@@ -419,8 +419,247 @@ __global__ void update_grid_velocity_query_max(uint32_t block_count, Grid grid, 
 	}
 }
 
-template<typename Partition, typename Grid>
-__global__ void g2p2g(float dt, float new_dt, const ParticleBuffer<MaterialE::J_FLUID> particle_buffer, ParticleBuffer<MaterialE::J_FLUID> next_particle_buffer, const Partition prev_partition, Partition partition, const Grid grid, Grid next_grid) {
+//Need this, cause we cannot partially instantiate function templates in current c++ version
+struct FetchParticleBufferDataIntermediate{
+	vec3 pos;
+	float J;
+};
+
+template<MaterialE MaterialType>
+__forceinline__ __device__ void fetch_particle_buffer_data(const ParticleBuffer<MaterialType> particle_buffer, int advection_source_blockno, int source_pidib, FetchParticleBufferDataIntermediate& data);
+
+template<>
+__forceinline__ __device__ void fetch_particle_buffer_data<MaterialE::J_FLUID>(const ParticleBuffer<MaterialE::J_FLUID> particle_buffer, int advection_source_blockno, int source_pidib, FetchParticleBufferDataIntermediate& data){
+	auto source_particle_bin = particle_buffer.ch(_0, advection_source_blockno);
+	data.pos[0]					 = source_particle_bin.val(_0, source_pidib % config::G_BIN_CAPACITY);
+	data.pos[1]					 = source_particle_bin.val(_1, source_pidib % config::G_BIN_CAPACITY);
+	data.pos[2]					 = source_particle_bin.val(_2, source_pidib % config::G_BIN_CAPACITY);
+	data.J						 = source_particle_bin.val(_3, source_pidib % config::G_BIN_CAPACITY);
+}
+
+template<>
+__forceinline__ __device__ void fetch_particle_buffer_data<MaterialE::FIXED_COROTATED>(const ParticleBuffer<MaterialE::FIXED_COROTATED> particle_buffer, int advection_source_blockno, int source_pidib, FetchParticleBufferDataIntermediate& data){
+	auto source_particle_bin = particle_buffer.ch(_0, advection_source_blockno);
+	data.pos[0]					 = source_particle_bin.val(_0, source_pidib % config::G_BIN_CAPACITY);
+	data.pos[1]					 = source_particle_bin.val(_1, source_pidib % config::G_BIN_CAPACITY);
+	data.pos[2]					 = source_particle_bin.val(_2, source_pidib % config::G_BIN_CAPACITY);
+}
+
+template<>
+__forceinline__ __device__ void fetch_particle_buffer_data<MaterialE::SAND>(const ParticleBuffer<MaterialE::SAND> particle_buffer, int advection_source_blockno, int source_pidib, FetchParticleBufferDataIntermediate& data){
+	auto source_particle_bin = particle_buffer.ch(_0, advection_source_blockno);
+	data.pos[0]					 = source_particle_bin.val(_0, source_pidib % config::G_BIN_CAPACITY);
+	data.pos[1]					 = source_particle_bin.val(_1, source_pidib % config::G_BIN_CAPACITY);
+	data.pos[2]					 = source_particle_bin.val(_2, source_pidib % config::G_BIN_CAPACITY);
+}
+
+template<>
+__forceinline__ __device__ void fetch_particle_buffer_data<MaterialE::NACC>(const ParticleBuffer<MaterialE::NACC> particle_buffer, int advection_source_blockno, int source_pidib, FetchParticleBufferDataIntermediate& data){
+	auto source_particle_bin = particle_buffer.ch(_0, advection_source_blockno);
+	data.pos[0]					 = source_particle_bin.val(_0, source_pidib % config::G_BIN_CAPACITY);
+	data.pos[1]					 = source_particle_bin.val(_1, source_pidib % config::G_BIN_CAPACITY);
+	data.pos[2]					 = source_particle_bin.val(_2, source_pidib % config::G_BIN_CAPACITY);
+}
+
+//Need this, cause we cannot partially instantiate function templates in current c++ version
+struct CalculateContributionAndStoreParticleDataIntermediate{
+	vec3 pos;
+	float J;
+};
+
+template<MaterialE MaterialType>
+__forceinline__ __device__ void calculate_contribution_and_store_particle_data(const ParticleBuffer<MaterialType> particle_buffer, const ParticleBuffer<MaterialType> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, float dt, float new_dt, const vec9& C, vec9& contrib, CalculateContributionAndStoreParticleDataIntermediate& data);
+
+template<>
+__forceinline__ __device__ void calculate_contribution_and_store_particle_data<MaterialE::J_FLUID>(const ParticleBuffer<MaterialE::J_FLUID> particle_buffer, const ParticleBuffer<MaterialE::J_FLUID> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, float dt, float new_dt, const vec9& C, vec9& contrib, CalculateContributionAndStoreParticleDataIntermediate& data){
+	//TODO: Find formula that explains this
+	//Update determinante of deformation gradiant?
+	//Divergence? multiplied with time and transfered to global space
+	data.J += (C[0] + C[4] + C[8]) * dt * config::G_D_INV * data.J;
+	
+	//Too low is bad. clamp to 0.1
+	//TODO: Maybe make this 0.1 a parameter
+	if(data.J < 0.1) {
+		data.J = 0.1;
+	}
+	
+	//TODO: What is calculated here?
+	{
+		float voln	   = data.J * particle_buffer.volume;
+		float pressure = particle_buffer.bulk * (powf(data.J, -particle_buffer.gamma) - 1.f);
+		{
+			contrib[0] = ((C[0] + C[0]) * config::G_D_INV * particle_buffer.visco - pressure) * voln;
+			contrib[1] = (C[1] + C[3]) * config::G_D_INV * particle_buffer.visco * voln;
+			contrib[2] = (C[2] + C[6]) * config::G_D_INV * particle_buffer.visco * voln;
+
+			contrib[3] = (C[3] + C[1]) * config::G_D_INV * particle_buffer.visco * voln;
+			contrib[4] = ((C[4] + C[4]) * config::G_D_INV * particle_buffer.visco - pressure) * voln;
+			contrib[5] = (C[5] + C[7]) * config::G_D_INV * particle_buffer.visco * voln;
+
+			contrib[6] = (C[6] + C[2]) * config::G_D_INV * particle_buffer.visco * voln;
+			contrib[7] = (C[7] + C[5]) * config::G_D_INV * particle_buffer.visco * voln;
+			contrib[8] = ((C[8] + C[8]) * config::G_D_INV * particle_buffer.visco - pressure) * voln;
+		}
+	}
+	
+	//Write back particle data
+	{
+		auto particle_bin									 = next_particle_buffer.ch(_0, next_particle_buffer.bin_offsets[src_blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
+		particle_bin.val(_0, particle_id_in_block % config::G_BIN_CAPACITY) = data.pos[0];
+		particle_bin.val(_1, particle_id_in_block % config::G_BIN_CAPACITY) = data.pos[1];
+		particle_bin.val(_2, particle_id_in_block % config::G_BIN_CAPACITY) = data.pos[2];
+		particle_bin.val(_3, particle_id_in_block % config::G_BIN_CAPACITY) = data.J;
+	}
+}
+
+template<>
+__forceinline__ __device__ void calculate_contribution_and_store_particle_data<MaterialE::FIXED_COROTATED>(const ParticleBuffer<MaterialE::FIXED_COROTATED> particle_buffer, const ParticleBuffer<MaterialE::FIXED_COROTATED> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, float dt, float new_dt, const vec9& C, vec9& contrib, CalculateContributionAndStoreParticleDataIntermediate& data){
+	vec3x3 dws;
+	#pragma unroll 9
+	for(int d = 0; d < 9; ++d) {
+		dws.val(d) = C[d] * dt * config::G_D_INV + ((d & 0x3) ? 0.f : 1.f);
+	}
+
+	{
+		vec9 F;
+		auto source_particle_bin = particle_buffer.ch(_0, advection_source_blockno);
+		contrib[0]				 = source_particle_bin.val(_3, source_pidib % config::G_BIN_CAPACITY);
+		contrib[1]				 = source_particle_bin.val(_4, source_pidib % config::G_BIN_CAPACITY);
+		contrib[2]				 = source_particle_bin.val(_5, source_pidib % config::G_BIN_CAPACITY);
+		contrib[3]				 = source_particle_bin.val(_6, source_pidib % config::G_BIN_CAPACITY);
+		contrib[4]				 = source_particle_bin.val(_7, source_pidib % config::G_BIN_CAPACITY);
+		contrib[5]				 = source_particle_bin.val(_8, source_pidib % config::G_BIN_CAPACITY);
+		contrib[6]				 = source_particle_bin.val(_9, source_pidib % config::G_BIN_CAPACITY);
+		contrib[7]				 = source_particle_bin.val(_10, source_pidib % config::G_BIN_CAPACITY);
+		contrib[8]				 = source_particle_bin.val(_11, source_pidib % config::G_BIN_CAPACITY);
+		matrix_matrix_multiplication_3d(dws.data_arr(), contrib.data_arr(), F.data_arr());
+		{
+			auto particle_bin									  = next_particle_buffer.ch(_0, next_particle_buffer.bin_offsets[src_blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
+			particle_bin.val(_0, particle_id_in_block % config::G_BIN_CAPACITY)  = data.pos[0];
+			particle_bin.val(_1, particle_id_in_block % config::G_BIN_CAPACITY)  = data.pos[1];
+			particle_bin.val(_2, particle_id_in_block % config::G_BIN_CAPACITY)  = data.pos[2];
+			particle_bin.val(_3, particle_id_in_block % config::G_BIN_CAPACITY)  = F[0];
+			particle_bin.val(_4, particle_id_in_block % config::G_BIN_CAPACITY)  = F[1];
+			particle_bin.val(_5, particle_id_in_block % config::G_BIN_CAPACITY)  = F[2];
+			particle_bin.val(_6, particle_id_in_block % config::G_BIN_CAPACITY)  = F[3];
+			particle_bin.val(_7, particle_id_in_block % config::G_BIN_CAPACITY)  = F[4];
+			particle_bin.val(_8, particle_id_in_block % config::G_BIN_CAPACITY)  = F[5];
+			particle_bin.val(_9, particle_id_in_block % config::G_BIN_CAPACITY)  = F[6];
+			particle_bin.val(_10, particle_id_in_block % config::G_BIN_CAPACITY) = F[7];
+			particle_bin.val(_11, particle_id_in_block % config::G_BIN_CAPACITY) = F[8];
+		}
+		ComputeStressIntermediate compute_stress_tmp;
+		compute_stress<float, MaterialE::FIXED_COROTATED>(particle_buffer.volume, particle_buffer.mu, particle_buffer.lambda, F, contrib, compute_stress_tmp);
+	}
+}
+
+template<>
+__forceinline__ __device__ void calculate_contribution_and_store_particle_data<MaterialE::SAND>(const ParticleBuffer<MaterialE::SAND> particle_buffer, const ParticleBuffer<MaterialE::SAND> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, float dt, float new_dt, const vec9& C, vec9& contrib, CalculateContributionAndStoreParticleDataIntermediate& data){
+	vec3x3 dws;
+	#pragma unroll 9
+	for(int d = 0; d < 9; ++d) {
+		dws.val(d) = C[d] * dt * config::G_D_INV + ((d & 0x3) ? 0.f : 1.f);
+	}
+
+	{
+		vec9 F;
+		float log_jp;
+		auto source_particle_bin = particle_buffer.ch(_0, advection_source_blockno);
+		contrib[0]				 = source_particle_bin.val(_3, source_pidib % config::G_BIN_CAPACITY);
+		contrib[1]				 = source_particle_bin.val(_4, source_pidib % config::G_BIN_CAPACITY);
+		contrib[2]				 = source_particle_bin.val(_5, source_pidib % config::G_BIN_CAPACITY);
+		contrib[3]				 = source_particle_bin.val(_6, source_pidib % config::G_BIN_CAPACITY);
+		contrib[4]				 = source_particle_bin.val(_7, source_pidib % config::G_BIN_CAPACITY);
+		contrib[5]				 = source_particle_bin.val(_8, source_pidib % config::G_BIN_CAPACITY);
+		contrib[6]				 = source_particle_bin.val(_9, source_pidib % config::G_BIN_CAPACITY);
+		contrib[7]				 = source_particle_bin.val(_10, source_pidib % config::G_BIN_CAPACITY);
+		contrib[8]				 = source_particle_bin.val(_11, source_pidib % config::G_BIN_CAPACITY);
+		log_jp					 = source_particle_bin.val(_12, source_pidib % config::G_BIN_CAPACITY);
+
+		matrix_matrix_multiplication_3d(dws.data_arr(), contrib.data_arr(), F.data_arr());
+		ComputeStressIntermediate compute_stress_tmp;
+		compute_stress_tmp.cohesion = particle_buffer.cohesion;
+		compute_stress_tmp.beta = particle_buffer.beta;
+		compute_stress_tmp.yield_surface = particle_buffer.yield_surface;
+		compute_stress_tmp.volume_correction = particle_buffer.volume_correction;
+		compute_stress_tmp.log_jp = log_jp;
+		compute_stress<float, MaterialE::SAND>(particle_buffer.volume, particle_buffer.mu, particle_buffer.lambda, F, contrib, compute_stress_tmp);
+		log_jp = compute_stress_tmp.log_jp;
+		{
+			auto particle_bin									  = next_particle_buffer.ch(_0, next_particle_buffer.bin_offsets[src_blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
+			particle_bin.val(_0, particle_id_in_block % config::G_BIN_CAPACITY)  = data.pos[0];
+			particle_bin.val(_1, particle_id_in_block % config::G_BIN_CAPACITY)  = data.pos[1];
+			particle_bin.val(_2, particle_id_in_block % config::G_BIN_CAPACITY)  = data.pos[2];
+			particle_bin.val(_3, particle_id_in_block % config::G_BIN_CAPACITY)  = F[0];
+			particle_bin.val(_4, particle_id_in_block % config::G_BIN_CAPACITY)  = F[1];
+			particle_bin.val(_5, particle_id_in_block % config::G_BIN_CAPACITY)  = F[2];
+			particle_bin.val(_6, particle_id_in_block % config::G_BIN_CAPACITY)  = F[3];
+			particle_bin.val(_7, particle_id_in_block % config::G_BIN_CAPACITY)  = F[4];
+			particle_bin.val(_8, particle_id_in_block % config::G_BIN_CAPACITY)  = F[5];
+			particle_bin.val(_9, particle_id_in_block % config::G_BIN_CAPACITY)  = F[6];
+			particle_bin.val(_10, particle_id_in_block % config::G_BIN_CAPACITY) = F[7];
+			particle_bin.val(_11, particle_id_in_block % config::G_BIN_CAPACITY) = F[8];
+			particle_bin.val(_12, particle_id_in_block % config::G_BIN_CAPACITY) = log_jp;
+		}
+		
+		vec9 contrib_tmp = (C * particle_buffer.mass - contrib * new_dt) * config::G_D_INV;
+	}
+}
+
+template<>
+__forceinline__ __device__ void calculate_contribution_and_store_particle_data<MaterialE::NACC>(const ParticleBuffer<MaterialE::NACC> particle_buffer, const ParticleBuffer<MaterialE::NACC> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, float dt, float new_dt, const vec9& C, vec9& contrib, CalculateContributionAndStoreParticleDataIntermediate& data){
+	vec3x3 dws;
+	#pragma unroll 9
+	for(int d = 0; d < 9; ++d) {
+		dws.val(d) = C[d] * dt * config::G_D_INV + ((d & 0x3) ? 0.f : 1.f);
+	}
+
+	{
+		vec9 F;
+		float log_jp;
+		auto source_particle_bin = particle_buffer.ch(_0, advection_source_blockno);
+		contrib[0]				 = source_particle_bin.val(_3, source_pidib % config::G_BIN_CAPACITY);
+		contrib[1]				 = source_particle_bin.val(_4, source_pidib % config::G_BIN_CAPACITY);
+		contrib[2]				 = source_particle_bin.val(_5, source_pidib % config::G_BIN_CAPACITY);
+		contrib[3]				 = source_particle_bin.val(_6, source_pidib % config::G_BIN_CAPACITY);
+		contrib[4]				 = source_particle_bin.val(_7, source_pidib % config::G_BIN_CAPACITY);
+		contrib[5]				 = source_particle_bin.val(_8, source_pidib % config::G_BIN_CAPACITY);
+		contrib[6]				 = source_particle_bin.val(_9, source_pidib % config::G_BIN_CAPACITY);
+		contrib[7]				 = source_particle_bin.val(_10, source_pidib % config::G_BIN_CAPACITY);
+		contrib[8]				 = source_particle_bin.val(_11, source_pidib % config::G_BIN_CAPACITY);
+		log_jp					 = source_particle_bin.val(_12, source_pidib % config::G_BIN_CAPACITY);
+
+		matrix_matrix_multiplication_3d(dws.data_arr(), contrib.data_arr(), F.data_arr());
+		ComputeStressIntermediate compute_stress_tmp;
+		compute_stress_tmp.bm = particle_buffer.bm;
+		compute_stress_tmp.xi = particle_buffer.xi;
+		compute_stress_tmp.beta = particle_buffer.beta;
+		compute_stress_tmp.msqr = particle_buffer.msqr;
+		compute_stress_tmp.hardening_on = particle_buffer.hardening_on;
+		compute_stress_tmp.log_jp = log_jp;
+		compute_stress<float, MaterialE::NACC>(particle_buffer.volume, particle_buffer.mu, particle_buffer.lambda, F, contrib, compute_stress_tmp);
+		log_jp = compute_stress_tmp.log_jp;
+		{
+			auto particle_bin									  = next_particle_buffer.ch(_0, next_particle_buffer.bin_offsets[src_blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
+			particle_bin.val(_0, particle_id_in_block % config::G_BIN_CAPACITY)  = data.pos[0];
+			particle_bin.val(_1, particle_id_in_block % config::G_BIN_CAPACITY)  = data.pos[1];
+			particle_bin.val(_2, particle_id_in_block % config::G_BIN_CAPACITY)  = data.pos[2];
+			particle_bin.val(_3, particle_id_in_block % config::G_BIN_CAPACITY)  = F[0];
+			particle_bin.val(_4, particle_id_in_block % config::G_BIN_CAPACITY)  = F[1];
+			particle_bin.val(_5, particle_id_in_block % config::G_BIN_CAPACITY)  = F[2];
+			particle_bin.val(_6, particle_id_in_block % config::G_BIN_CAPACITY)  = F[3];
+			particle_bin.val(_7, particle_id_in_block % config::G_BIN_CAPACITY)  = F[4];
+			particle_bin.val(_8, particle_id_in_block % config::G_BIN_CAPACITY)  = F[5];
+			particle_bin.val(_9, particle_id_in_block % config::G_BIN_CAPACITY)  = F[6];
+			particle_bin.val(_10, particle_id_in_block % config::G_BIN_CAPACITY) = F[7];
+			particle_bin.val(_11, particle_id_in_block % config::G_BIN_CAPACITY) = F[8];
+			particle_bin.val(_12, particle_id_in_block % config::G_BIN_CAPACITY) = log_jp;
+		}
+	}
+}
+
+template<typename Partition, typename Grid, MaterialE MaterialType>
+__global__ void g2p2g(float dt, float new_dt, const ParticleBuffer<MaterialType> particle_buffer, ParticleBuffer<MaterialType> next_particle_buffer, const Partition prev_partition, Partition partition, const Grid grid, Grid next_grid) {
 	static constexpr uint64_t NUM_VI_PER_BLOCK = static_cast<uint64_t>(config::G_BLOCKVOLUME) * 3;
 	static constexpr uint64_t NUM_VI_IN_ARENA  = NUM_VI_PER_BLOCK << 3;
 
@@ -527,15 +766,10 @@ __global__ void g2p2g(float dt, float new_dt, const ParticleBuffer<MaterialE::J_
 		}
 		
 		//Fetch position and determinant of deformation gradient
-		vec3 pos;
-		float J;
-		{
-			const auto source_particle_bin = particle_buffer.ch(_0, advection_source_blockno);
-			pos[0]					 = source_particle_bin.val(_0, source_pidib % config::G_BIN_CAPACITY);
-			pos[1]					 = source_particle_bin.val(_1, source_pidib % config::G_BIN_CAPACITY);
-			pos[2]					 = source_particle_bin.val(_2, source_pidib % config::G_BIN_CAPACITY);
-			J						 = source_particle_bin.val(_3, source_pidib % config::G_BIN_CAPACITY);
-		}
+		FetchParticleBufferDataIntermediate fetch_particle_buffer_tmp;
+		fetch_particle_buffer_data<MaterialType>(particle_buffer, advection_source_blockno, source_pidib, fetch_particle_buffer_tmp);
+		vec3 pos = fetch_particle_buffer_tmp.pos;
+		float J = fetch_particle_buffer_tmp.J;
 		
 		//Get position of grid cell
 		ivec3 global_base_index = get_block_id(pos) - 1;
@@ -603,46 +837,13 @@ __global__ void g2p2g(float dt, float new_dt, const ParticleBuffer<MaterialE::J_
 		//Update particle position
 		pos += vel * dt;
 
-		//TODO: Find formula that explains this
-		//Update determinante of deformation gradiant?
-		//Divergence? multiplied with time and transfered to global space
-		J += (C[0] + C[4] + C[8]) * dt * config::G_D_INV * J;
-		
-		//Too low is bad. clamp to 0.1
-		//TODO: Maybe make this 0.1 a parameter
-		if(J < 0.1) {
-			J = 0.1;
-		}
-		
-		//TODO: What is calculated here?
+		CalculateContributionAndStoreParticleDataIntermediate store_particle_buffer_tmp;
+		store_particle_buffer_tmp.pos = pos;
+		store_particle_buffer_tmp.J = J;
+
 		vec9 contrib;
-		{
-			float voln	   = J * particle_buffer.volume;
-			float pressure = particle_buffer.bulk * (powf(J, -particle_buffer.gamma) - 1.f);
-			{
-				contrib[0] = ((C[0] + C[0]) * config::G_D_INV * particle_buffer.visco - pressure) * voln;
-				contrib[1] = (C[1] + C[3]) * config::G_D_INV * particle_buffer.visco * voln;
-				contrib[2] = (C[2] + C[6]) * config::G_D_INV * particle_buffer.visco * voln;
-
-				contrib[3] = (C[3] + C[1]) * config::G_D_INV * particle_buffer.visco * voln;
-				contrib[4] = ((C[4] + C[4]) * config::G_D_INV * particle_buffer.visco - pressure) * voln;
-				contrib[5] = (C[5] + C[7]) * config::G_D_INV * particle_buffer.visco * voln;
-
-				contrib[6] = (C[6] + C[2]) * config::G_D_INV * particle_buffer.visco * voln;
-				contrib[7] = (C[7] + C[5]) * config::G_D_INV * particle_buffer.visco * voln;
-				contrib[8] = ((C[8] + C[8]) * config::G_D_INV * particle_buffer.visco - pressure) * voln;
-			}
-			contrib = (C * particle_buffer.mass - contrib * new_dt) * config::G_D_INV;
-		}
-		
-		//Write back particle data
-		{
-			auto particle_bin									 = next_particle_buffer.ch(_0, next_particle_buffer.bin_offsets[src_blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
-			particle_bin.val(_0, particle_id_in_block % config::G_BIN_CAPACITY) = pos[0];
-			particle_bin.val(_1, particle_id_in_block % config::G_BIN_CAPACITY) = pos[1];
-			particle_bin.val(_2, particle_id_in_block % config::G_BIN_CAPACITY) = pos[2];
-			particle_bin.val(_3, particle_id_in_block % config::G_BIN_CAPACITY) = J;
-		}
+		calculate_contribution_and_store_particle_data<MaterialType>(particle_buffer, next_particle_buffer, advection_source_blockno, source_pidib, src_blockno, particle_id_in_block, dt, new_dt, C, contrib, store_particle_buffer_tmp);
+		contrib = (C * particle_buffer.mass - contrib * new_dt) * config::G_D_INV;
 
 		//Calculate grid index after movement and store index and movement direction
 		ivec3 new_global_base_index = get_block_id(pos) - 1;
@@ -718,719 +919,6 @@ __global__ void g2p2g(float dt, float new_dt, const ParticleBuffer<MaterialE::J_
 		channelid >>= config::G_BLOCKBITS;
 
 		const char cx = static_cast<char>(channelid & config::G_BLOCKMASK);
-		channelid >>= config::G_BLOCKBITS;
-
-		float val = p2gbuffer[channelid][static_cast<size_t>(static_cast<size_t>(cx) + (local_block_id & 4 ? config::G_BLOCKSIZE : 0))][static_cast<size_t>(static_cast<size_t>(cy) + (local_block_id & 2 ? config::G_BLOCKSIZE : 0))][static_cast<size_t>(static_cast<size_t>(cz) + (local_block_id & 1 ? config::G_BLOCKSIZE : 0))];
-		if(channelid == 0) {
-			atomicAdd(&next_grid.ch(_0, blockno).val_1d(_0, c), val);
-		} else if(channelid == 1) {
-			atomicAdd(&next_grid.ch(_0, blockno).val_1d(_1, c), val);
-		} else if(channelid == 2) {
-			atomicAdd(&next_grid.ch(_0, blockno).val_1d(_2, c), val);
-		} else {
-			atomicAdd(&next_grid.ch(_0, blockno).val_1d(_3, c), val);
-		}
-	}
-}
-
-template<typename Partition, typename Grid>
-__global__ void g2p2g(float dt, float new_dt, const ParticleBuffer<MaterialE::FIXED_COROTATED> particle_buffer, ParticleBuffer<MaterialE::FIXED_COROTATED> next_particle_buffer, const Partition prev_partition, Partition partition, const Grid grid, Grid next_grid) {
-	static constexpr uint64_t NUM_VI_PER_BLOCK = static_cast<uint64_t>(config::G_BLOCKVOLUME) * 3;
-	static constexpr uint64_t NUM_VI_IN_ARENA  = NUM_VI_PER_BLOCK << 3;
-
-	static constexpr uint64_t NUM_M_VI_PER_BLOCK = static_cast<uint64_t>(config::G_BLOCKVOLUME) * 4;
-	static constexpr uint64_t NUM_M_VI_IN_ARENA	 = NUM_M_VI_PER_BLOCK << 3;
-
-	static constexpr unsigned ARENAMASK = (config::G_BLOCKSIZE << 1) - 1;
-	static constexpr unsigned ARENABITS = config::G_BLOCKBITS + 1;
-
-	using ViArena	  = std::array<std::array<std::array<std::array<float, config::G_BLOCKSIZE << 1>, config::G_BLOCKSIZE << 1>, config::G_BLOCKSIZE << 1>, 3>*;
-	using ViArenaRef  = std::array<std::array<std::array<std::array<float, config::G_BLOCKSIZE << 1>, config::G_BLOCKSIZE << 1>, config::G_BLOCKSIZE << 1>, 3>&;
-	using MViArena	  = std::array<std::array<std::array<std::array<float, config::G_BLOCKSIZE << 1>, config::G_BLOCKSIZE << 1>, config::G_BLOCKSIZE << 1>, 4>*;
-	using MViArenaRef = std::array<std::array<std::array<std::array<float, config::G_BLOCKSIZE << 1>, config::G_BLOCKSIZE << 1>, config::G_BLOCKSIZE << 1>, 4>&;
-
-	static constexpr size_t shared_memory_size = (3 + 4) * (config::G_BLOCKSIZE << 1) *(config::G_BLOCKSIZE << 1) * (config::G_BLOCKSIZE << 1) * sizeof(float);
-	__shared__ char shmem[shared_memory_size];//NOLINT(modernize-avoid-c-arrays, readability-redundant-declaration) Cannot declare runtime size shared memory as std::array; extern has different meaning here
-
-	ViArenaRef __restrict__ g2pbuffer  = *static_cast<ViArena>(static_cast<void*>(static_cast<char*>(shmem)));
-	MViArenaRef __restrict__ p2gbuffer = *static_cast<MViArena>(static_cast<void*>(static_cast<char*>(shmem) + NUM_VI_IN_ARENA * sizeof(float)));
-
-	int src_blockno = static_cast<int>(blockIdx.x);
-	int particle_bucket_size			= next_particle_buffer.particle_bucket_sizes[src_blockno];
-	if(particle_bucket_size == 0) {
-		return;
-	}
-	auto blockid = partition.active_keys[blockIdx.x];
-
-	for(int base = static_cast<int>(threadIdx.x); base < NUM_VI_IN_ARENA; base += static_cast<int>(blockDim.x)) {
-		char local_block_id = static_cast<char>(base / NUM_VI_PER_BLOCK);
-		auto blockno		= partition.query(ivec3 {blockid[0] + ((local_block_id & 4) != 0 ? 1 : 0), blockid[1] + ((local_block_id & 2) != 0 ? 1 : 0), blockid[2] + ((local_block_id & 1) != 0 ? 1 : 0)});
-		auto grid_block		= grid.ch(_0, blockno);
-		int channelid		= static_cast<int>(base % NUM_VI_PER_BLOCK);
-		char c				= static_cast<char>(channelid & 0x3f);
-
-		char cz = static_cast<char>(channelid & config::G_BLOCKMASK);
-		channelid >>= config::G_BLOCKBITS;
-
-		char cy = static_cast<char>(channelid & config::G_BLOCKMASK);
-		channelid >>= config::G_BLOCKBITS;
-
-		char cx = static_cast<char>(channelid & config::G_BLOCKMASK);
-		channelid >>= config::G_BLOCKBITS;
-
-		float val;
-		if(channelid == 0) {
-			val = grid_block.val_1d(_1, c);
-		} else if(channelid == 1) {
-			val = grid_block.val_1d(_2, c);
-		} else {
-			val = grid_block.val_1d(_3, c);
-		}
-		g2pbuffer[channelid][static_cast<size_t>(static_cast<size_t>(cx) + (local_block_id & 4 ? config::G_BLOCKSIZE : 0))][static_cast<size_t>(static_cast<size_t>(cy) + (local_block_id & 2 ? config::G_BLOCKSIZE : 0))][static_cast<size_t>(static_cast<size_t>(cz) + (local_block_id & 1 ? config::G_BLOCKSIZE : 0))] = val;
-	}
-	__syncthreads();
-	for(int base = static_cast<int>(threadIdx.x); base < NUM_M_VI_IN_ARENA; base += static_cast<int>(blockDim.x)) {
-		int loc = static_cast<int>(base);
-
-		char z = static_cast<char>(loc & ARENAMASK);
-		loc >>= ARENABITS;
-
-		char y = static_cast<char>(loc & ARENAMASK);
-		loc >>= ARENABITS;
-
-		char x								 = static_cast<char>(loc & ARENAMASK);
-		p2gbuffer[loc >> ARENABITS][x][y][z] = 0.0f;
-	}
-	__syncthreads();
-
-	for(int particle_id_in_block = static_cast<int>(threadIdx.x); particle_id_in_block < particle_bucket_size; particle_id_in_block += static_cast<int>(blockDim.x)) {
-		int advection_source_blockno;
-		int source_pidib;
-		ivec3 base_index;
-		{
-			int advect = next_particle_buffer.blockbuckets[src_blockno * config::G_PARTICLE_NUM_PER_BLOCK + particle_id_in_block];
-			dir_components(advect / config::G_PARTICLE_NUM_PER_BLOCK, base_index);
-			base_index += blockid;
-			advection_source_blockno = prev_partition.query(base_index);
-			source_pidib   = advect & (config::G_PARTICLE_NUM_PER_BLOCK - 1);
-			advection_source_blockno = particle_buffer.bin_offsets[advection_source_blockno] + source_pidib / config::G_BIN_CAPACITY;
-		}
-		vec3 pos;
-		{
-			auto source_particle_bin = particle_buffer.ch(_0, advection_source_blockno);
-			pos[0]					 = source_particle_bin.val(_0, source_pidib % config::G_BIN_CAPACITY);
-			pos[1]					 = source_particle_bin.val(_1, source_pidib % config::G_BIN_CAPACITY);
-			pos[2]					 = source_particle_bin.val(_2, source_pidib % config::G_BIN_CAPACITY);
-		}
-		ivec3 local_base_index = get_block_id(pos) - 1;
-		vec3 local_pos		   = pos - local_base_index * config::G_DX;
-		base_index			   = local_base_index;
-
-		vec3x3 dws;
-#pragma unroll 3
-		for(int dd = 0; dd < 3; ++dd) {
-			float d	   = (local_pos[dd] - (std::round(local_pos[dd] * config::G_DX_INV) - 1.0f) * config::G_DX) * config::G_DX_INV;
-			dws(dd, 0) = 0.5f * (1.5f - d) * (1.5f - d);
-			d -= 1.0f;
-			dws(dd, 1)			 = 0.75f - d * d;
-			d					 = 0.5f + d;
-			dws(dd, 2)			 = 0.5f * d * d;
-			local_base_index[dd] = ((local_base_index[dd] - 1) & config::G_BLOCKMASK) + 1;
-		}
-		vec3 vel;
-		vel.set(0.f);
-		vec9 C;
-		C.set(0.f);
-#pragma unroll 3
-		for(char i = 0; i < 3; i++) {
-#pragma unroll 3
-			for(char j = 0; j < 3; j++) {
-#pragma unroll 3
-				for(char k = 0; k < 3; k++) {
-					vec3 xixp = vec3 {static_cast<float>(i), static_cast<float>(j), static_cast<float>(k)} * config::G_DX - local_pos;
-					float W	  = dws(0, i) * dws(1, j) * dws(2, k);
-					vec3 vi {g2pbuffer[0][static_cast<size_t>(static_cast<size_t>(local_base_index[0]) + i)][static_cast<size_t>(static_cast<size_t>(local_base_index[1]) + j)][static_cast<size_t>(static_cast<size_t>(local_base_index[2]) + k)], g2pbuffer[1][static_cast<size_t>(static_cast<size_t>(local_base_index[0]) + i)][static_cast<size_t>(static_cast<size_t>(local_base_index[1]) + j)][static_cast<size_t>(static_cast<size_t>(local_base_index[2]) + k)], g2pbuffer[2][static_cast<size_t>(static_cast<size_t>(local_base_index[0]) + i)][static_cast<size_t>(static_cast<size_t>(local_base_index[1]) + j)][static_cast<size_t>(static_cast<size_t>(local_base_index[2]) + k)]};
-					vel += vi * W;
-					C[0] += W * vi[0] * xixp[0];
-					C[1] += W * vi[1] * xixp[0];
-					C[2] += W * vi[2] * xixp[0];
-					C[3] += W * vi[0] * xixp[1];
-					C[4] += W * vi[1] * xixp[1];
-					C[5] += W * vi[2] * xixp[1];
-					C[6] += W * vi[0] * xixp[2];
-					C[7] += W * vi[1] * xixp[2];
-					C[8] += W * vi[2] * xixp[2];
-				}
-			}
-		}
-		pos += vel * dt;
-
-#pragma unroll 9
-		for(int d = 0; d < 9; ++d) {
-			dws.val(d) = C[d] * dt * config::G_D_INV + ((d & 0x3) ? 0.f : 1.f);
-		}
-
-		vec9 contrib;
-		{
-			vec9 F;
-			auto source_particle_bin = particle_buffer.ch(_0, advection_source_blockno);
-			contrib[0]				 = source_particle_bin.val(_3, source_pidib % config::G_BIN_CAPACITY);
-			contrib[1]				 = source_particle_bin.val(_4, source_pidib % config::G_BIN_CAPACITY);
-			contrib[2]				 = source_particle_bin.val(_5, source_pidib % config::G_BIN_CAPACITY);
-			contrib[3]				 = source_particle_bin.val(_6, source_pidib % config::G_BIN_CAPACITY);
-			contrib[4]				 = source_particle_bin.val(_7, source_pidib % config::G_BIN_CAPACITY);
-			contrib[5]				 = source_particle_bin.val(_8, source_pidib % config::G_BIN_CAPACITY);
-			contrib[6]				 = source_particle_bin.val(_9, source_pidib % config::G_BIN_CAPACITY);
-			contrib[7]				 = source_particle_bin.val(_10, source_pidib % config::G_BIN_CAPACITY);
-			contrib[8]				 = source_particle_bin.val(_11, source_pidib % config::G_BIN_CAPACITY);
-			matrix_matrix_multiplication_3d(dws.data_arr(), contrib.data_arr(), F.data_arr());
-			{
-				auto particle_bin									  = next_particle_buffer.ch(_0, next_particle_buffer.bin_offsets[src_blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
-				particle_bin.val(_0, particle_id_in_block % config::G_BIN_CAPACITY)  = pos[0];
-				particle_bin.val(_1, particle_id_in_block % config::G_BIN_CAPACITY)  = pos[1];
-				particle_bin.val(_2, particle_id_in_block % config::G_BIN_CAPACITY)  = pos[2];
-				particle_bin.val(_3, particle_id_in_block % config::G_BIN_CAPACITY)  = F[0];
-				particle_bin.val(_4, particle_id_in_block % config::G_BIN_CAPACITY)  = F[1];
-				particle_bin.val(_5, particle_id_in_block % config::G_BIN_CAPACITY)  = F[2];
-				particle_bin.val(_6, particle_id_in_block % config::G_BIN_CAPACITY)  = F[3];
-				particle_bin.val(_7, particle_id_in_block % config::G_BIN_CAPACITY)  = F[4];
-				particle_bin.val(_8, particle_id_in_block % config::G_BIN_CAPACITY)  = F[5];
-				particle_bin.val(_9, particle_id_in_block % config::G_BIN_CAPACITY)  = F[6];
-				particle_bin.val(_10, particle_id_in_block % config::G_BIN_CAPACITY) = F[7];
-				particle_bin.val(_11, particle_id_in_block % config::G_BIN_CAPACITY) = F[8];
-			}
-			compute_stress_fixed_corotated(particle_buffer.volume, particle_buffer.mu, particle_buffer.lambda, F, contrib);
-			contrib = (C * particle_buffer.mass - contrib * new_dt) * config::G_D_INV;
-		}
-
-		local_base_index = get_block_id(pos) - 1;
-		{
-			int dirtag = dir_offset((base_index - 1) / static_cast<int>(config::G_BLOCKSIZE) - (local_base_index - 1) / static_cast<int>(config::G_BLOCKSIZE));
-			next_particle_buffer.add_advection(partition, local_base_index - 1, dirtag, particle_id_in_block);
-			// partition.add_advection(local_base_index - 1, dirtag, particle_id_in_block);
-		}
-		// dws[d] = bspline_weight(local_pos[d]);
-
-#pragma unroll 3
-		for(char dd = 0; dd < 3; ++dd) {
-			local_pos[dd] = pos[dd] - static_cast<float>(local_base_index[dd]) * config::G_DX;
-			float d		  = (local_pos[dd] - (std::round(local_pos[dd] * config::G_DX_INV) - 1.0f) * config::G_DX) * config::G_DX_INV;
-			dws(dd, 0)	  = 0.5f * (1.5f - d) * (1.5f - d);
-			d -= 1.0f;
-			dws(dd, 1) = 0.75f - d * d;
-			d		   = 0.5f + d;
-			dws(dd, 2) = 0.5f * d * d;
-
-			local_base_index[dd] = (((base_index[dd] - 1) & config::G_BLOCKMASK) + 1) + local_base_index[dd] - base_index[dd];
-		}
-#pragma unroll 3
-		for(char i = 0; i < 3; i++) {
-#pragma unroll 3
-			for(char j = 0; j < 3; j++) {
-#pragma unroll 3
-				for(char k = 0; k < 3; k++) {
-					pos		= vec3 {static_cast<float>(i), static_cast<float>(j), static_cast<float>(k)} * config::G_DX - local_pos;
-					float W = dws(0, i) * dws(1, j) * dws(2, k);
-					auto wm = particle_buffer.mass * W;
-					atomicAdd(&p2gbuffer[0][static_cast<size_t>(static_cast<size_t>(local_base_index[0]) + i)][static_cast<size_t>(static_cast<size_t>(local_base_index[1]) + j)][static_cast<size_t>(static_cast<size_t>(local_base_index[2]) + k)], wm);
-					atomicAdd(&p2gbuffer[1][static_cast<size_t>(static_cast<size_t>(local_base_index[0]) + i)][static_cast<size_t>(static_cast<size_t>(local_base_index[1]) + j)][static_cast<size_t>(static_cast<size_t>(local_base_index[2]) + k)], wm * vel[0] + (contrib[0] * pos[0] + contrib[3] * pos[1] + contrib[6] * pos[2]) * W);
-					atomicAdd(&p2gbuffer[2][static_cast<size_t>(static_cast<size_t>(local_base_index[0]) + i)][static_cast<size_t>(static_cast<size_t>(local_base_index[1]) + j)][static_cast<size_t>(static_cast<size_t>(local_base_index[2]) + k)], wm * vel[1] + (contrib[1] * pos[0] + contrib[4] * pos[1] + contrib[7] * pos[2]) * W);
-					atomicAdd(&p2gbuffer[3][static_cast<size_t>(static_cast<size_t>(local_base_index[0]) + i)][static_cast<size_t>(static_cast<size_t>(local_base_index[1]) + j)][static_cast<size_t>(static_cast<size_t>(local_base_index[2]) + k)], wm * vel[2] + (contrib[2] * pos[0] + contrib[5] * pos[1] + contrib[8] * pos[2]) * W);
-				}
-			}
-		}
-	}
-	__syncthreads();
-	/// arena no, channel no, cell no
-	for(int base = static_cast<int>(threadIdx.x); base < NUM_M_VI_IN_ARENA; base += static_cast<int>(blockDim.x)) {
-		char local_block_id = static_cast<char>(base / NUM_M_VI_PER_BLOCK);
-		auto blockno		= partition.query(ivec3 {blockid[0] + ((local_block_id & 4) != 0 ? 1 : 0), blockid[1] + ((local_block_id & 2) != 0 ? 1 : 0), blockid[2] + ((local_block_id & 1) != 0 ? 1 : 0)});
-		// auto grid_block = next_grid.template ch<0>(blockno);
-		int channelid = static_cast<int>(base & (NUM_M_VI_PER_BLOCK - 1));
-		char c		  = static_cast<char>(channelid % config::G_BLOCKVOLUME);
-
-		char cz = static_cast<char>(channelid & config::G_BLOCKMASK);
-		channelid >>= config::G_BLOCKBITS;
-
-		char cy = static_cast<char>(channelid & config::G_BLOCKMASK);
-		channelid >>= config::G_BLOCKBITS;
-
-		char cx = static_cast<char>(channelid & config::G_BLOCKMASK);
-		channelid >>= config::G_BLOCKBITS;
-		float val = p2gbuffer[channelid][static_cast<size_t>(static_cast<size_t>(cx) + (local_block_id & 4 ? config::G_BLOCKSIZE : 0))][static_cast<size_t>(static_cast<size_t>(cy) + (local_block_id & 2 ? config::G_BLOCKSIZE : 0))][static_cast<size_t>(static_cast<size_t>(cz) + (local_block_id & 1 ? config::G_BLOCKSIZE : 0))];
-		if(channelid == 0) {
-			atomicAdd(&next_grid.ch(_0, blockno).val_1d(_0, c), val);
-		} else if(channelid == 1) {
-			atomicAdd(&next_grid.ch(_0, blockno).val_1d(_1, c), val);
-		} else if(channelid == 2) {
-			atomicAdd(&next_grid.ch(_0, blockno).val_1d(_2, c), val);
-		} else {
-			atomicAdd(&next_grid.ch(_0, blockno).val_1d(_3, c), val);
-		}
-	}
-}
-
-template<typename Partition, typename Grid>
-__global__ void g2p2g(float dt, float new_dt, const ParticleBuffer<MaterialE::SAND> particle_buffer, ParticleBuffer<MaterialE::SAND> next_particle_buffer, const Partition prev_partition, Partition partition, const Grid grid, Grid next_grid) {
-	static constexpr uint64_t NUM_VI_PER_BLOCK = static_cast<uint64_t>(config::G_BLOCKVOLUME) * 3;
-	static constexpr uint64_t NUM_VI_IN_ARENA  = NUM_VI_PER_BLOCK << 3;
-
-	static constexpr uint64_t NUM_M_VI_PER_BLOCK = static_cast<uint64_t>(config::G_BLOCKVOLUME) * 4;
-	static constexpr uint64_t NUM_M_VI_IN_ARENA	 = NUM_M_VI_PER_BLOCK << 3;
-
-	static constexpr unsigned ARENAMASK = (config::G_BLOCKSIZE << 1) - 1;
-	static constexpr unsigned ARENABITS = config::G_BLOCKBITS + 1;
-
-	using ViArena	  = std::array<std::array<std::array<std::array<float, config::G_BLOCKSIZE << 1>, config::G_BLOCKSIZE << 1>, config::G_BLOCKSIZE << 1>, 3>*;
-	using ViArenaRef  = std::array<std::array<std::array<std::array<float, config::G_BLOCKSIZE << 1>, config::G_BLOCKSIZE << 1>, config::G_BLOCKSIZE << 1>, 3>&;
-	using MViArena	  = std::array<std::array<std::array<std::array<float, config::G_BLOCKSIZE << 1>, config::G_BLOCKSIZE << 1>, config::G_BLOCKSIZE << 1>, 4>*;
-	using MViArenaRef = std::array<std::array<std::array<std::array<float, config::G_BLOCKSIZE << 1>, config::G_BLOCKSIZE << 1>, config::G_BLOCKSIZE << 1>, 4>&;
-
-	static constexpr size_t shared_memory_size = (3 + 4) * (config::G_BLOCKSIZE << 1) *(config::G_BLOCKSIZE << 1) * (config::G_BLOCKSIZE << 1) * sizeof(float);
-	__shared__ char shmem[shared_memory_size];//NOLINT(modernize-avoid-c-arrays, readability-redundant-declaration) Cannot declare runtime size shared memory as std::array; extern has different meaning here
-
-	ViArenaRef __restrict__ g2pbuffer  = *static_cast<ViArena>(static_cast<void*>(static_cast<char*>(shmem)));
-	MViArenaRef __restrict__ p2gbuffer = *static_cast<MViArena>(static_cast<void*>(static_cast<char*>(shmem) + NUM_VI_IN_ARENA * sizeof(float)));
-
-	int src_blockno = static_cast<int>(blockIdx.x);
-	auto blockid	= partition.active_keys[blockIdx.x];
-
-	for(int base = static_cast<int>(threadIdx.x); base < NUM_VI_IN_ARENA; base += static_cast<int>(blockDim.x)) {
-		char local_block_id = static_cast<char>(base / NUM_VI_PER_BLOCK);
-		auto blockno		= partition.query(ivec3 {blockid[0] + ((local_block_id & 4) != 0 ? 1 : 0), blockid[1] + ((local_block_id & 2) != 0 ? 1 : 0), blockid[2] + ((local_block_id & 1) != 0 ? 1 : 0)});
-		auto grid_block		= grid.ch(_0, blockno);
-		int channelid		= static_cast<int>(base % NUM_VI_PER_BLOCK);
-		char c				= static_cast<char>(channelid & 0x3f);
-
-		char cz = static_cast<char>(channelid & config::G_BLOCKMASK);
-		channelid >>= config::G_BLOCKBITS;
-
-		char cy = static_cast<char>(channelid & config::G_BLOCKMASK);
-		channelid >>= config::G_BLOCKBITS;
-
-		char cx = static_cast<char>(channelid & config::G_BLOCKMASK);
-		channelid >>= config::G_BLOCKBITS;
-
-		float val;
-		if(channelid == 0) {
-			val = grid_block.val_1d(_1, c);
-		} else if(channelid == 1) {
-			val = grid_block.val_1d(_2, c);
-		} else {
-			val = grid_block.val_1d(_3, c);
-		}
-		g2pbuffer[channelid][static_cast<size_t>(static_cast<size_t>(cx) + (local_block_id & 4 ? config::G_BLOCKSIZE : 0))][static_cast<size_t>(static_cast<size_t>(cy) + (local_block_id & 2 ? config::G_BLOCKSIZE : 0))][static_cast<size_t>(static_cast<size_t>(cz) + (local_block_id & 1 ? config::G_BLOCKSIZE : 0))] = val;
-	}
-	__syncthreads();
-	for(int base = static_cast<int>(threadIdx.x); base < NUM_M_VI_IN_ARENA; base += static_cast<int>(blockDim.x)) {
-		int loc = static_cast<int>(base);
-		char z	= static_cast<char>(loc & ARENAMASK);
-		loc >>= ARENABITS;
-
-		char y = static_cast<char>(loc & ARENAMASK);
-		loc >>= ARENABITS;
-
-		char x								 = static_cast<char>(loc & ARENAMASK);
-		p2gbuffer[loc >> ARENABITS][x][y][z] = 0.0f;
-	}
-	__syncthreads();
-
-	for(int particle_id_in_block = static_cast<int>(threadIdx.x); particle_id_in_block < next_particle_buffer.particle_bucket_sizes[src_blockno]; particle_id_in_block += static_cast<int>(blockDim.x)) {
-		int advection_source_blockno;
-		int source_pidib;
-		ivec3 base_index;
-		{
-			int advect = next_particle_buffer.blockbuckets[src_blockno * config::G_PARTICLE_NUM_PER_BLOCK + particle_id_in_block];
-			dir_components(advect / config::G_PARTICLE_NUM_PER_BLOCK, base_index);
-			base_index += blockid;
-			advection_source_blockno = prev_partition.query(base_index);
-			source_pidib   = advect & (config::G_PARTICLE_NUM_PER_BLOCK - 1);
-			advection_source_blockno = particle_buffer.bin_offsets[advection_source_blockno] + source_pidib / config::G_BIN_CAPACITY;
-		}
-		vec3 pos;
-		{
-			auto source_particle_bin = particle_buffer.ch(_0, advection_source_blockno);
-			pos[0]					 = source_particle_bin.val(_0, source_pidib % config::G_BIN_CAPACITY);
-			pos[1]					 = source_particle_bin.val(_1, source_pidib % config::G_BIN_CAPACITY);
-			pos[2]					 = source_particle_bin.val(_2, source_pidib % config::G_BIN_CAPACITY);
-		}
-		ivec3 local_base_index = get_block_id(pos) - 1;
-		vec3 local_pos		   = pos - local_base_index * config::G_DX;
-		base_index			   = local_base_index;
-
-		vec3x3 dws;
-#pragma unroll 3
-		for(int dd = 0; dd < 3; ++dd) {
-			float d	   = (local_pos[dd] - (std::round(local_pos[dd] * config::G_DX_INV) - 1.0f) * config::G_DX) * config::G_DX_INV;
-			dws(dd, 0) = 0.5f * (1.5f - d) * (1.5f - d);
-			d -= 1.0f;
-			dws(dd, 1)			 = 0.75f - d * d;
-			d					 = 0.5f + d;
-			dws(dd, 2)			 = 0.5f * d * d;
-			local_base_index[dd] = ((local_base_index[dd] - 1) & config::G_BLOCKMASK) + 1;
-		}
-		vec3 vel;
-		vel.set(0.f);
-		vec9 C;
-		C.set(0.f);
-#pragma unroll 3
-		for(char i = 0; i < 3; i++) {
-#pragma unroll 3
-			for(char j = 0; j < 3; j++) {
-#pragma unroll 3
-				for(char k = 0; k < 3; k++) {
-					vec3 xixp = vec3 {static_cast<float>(i), static_cast<float>(j), static_cast<float>(k)} * config::G_DX - local_pos;
-					float W	  = dws(0, i) * dws(1, j) * dws(2, k);
-					vec3 vi {g2pbuffer[0][static_cast<size_t>(static_cast<size_t>(local_base_index[0]) + i)][static_cast<size_t>(static_cast<size_t>(local_base_index[1]) + j)][static_cast<size_t>(static_cast<size_t>(local_base_index[2]) + k)], g2pbuffer[1][static_cast<size_t>(static_cast<size_t>(local_base_index[0]) + i)][static_cast<size_t>(static_cast<size_t>(local_base_index[1]) + j)][static_cast<size_t>(static_cast<size_t>(local_base_index[2]) + k)], g2pbuffer[2][static_cast<size_t>(static_cast<size_t>(local_base_index[0]) + i)][static_cast<size_t>(static_cast<size_t>(local_base_index[1]) + j)][static_cast<size_t>(static_cast<size_t>(local_base_index[2]) + k)]};
-					vel += vi * W;
-					C[0] += W * vi[0] * xixp[0];
-					C[1] += W * vi[1] * xixp[0];
-					C[2] += W * vi[2] * xixp[0];
-					C[3] += W * vi[0] * xixp[1];
-					C[4] += W * vi[1] * xixp[1];
-					C[5] += W * vi[2] * xixp[1];
-					C[6] += W * vi[0] * xixp[2];
-					C[7] += W * vi[1] * xixp[2];
-					C[8] += W * vi[2] * xixp[2];
-				}
-			}
-		}
-		pos += vel * dt;
-
-#pragma unroll 9
-		for(int d = 0; d < 9; ++d) {
-			dws.val(d) = C[d] * dt * config::G_D_INV + ((d & 0x3) ? 0.f : 1.f);
-		}
-
-		vec9 contrib;
-		{
-			vec9 F;
-			float logJp;
-			auto source_particle_bin = particle_buffer.ch(_0, advection_source_blockno);
-			contrib[0]				 = source_particle_bin.val(_3, source_pidib % config::G_BIN_CAPACITY);
-			contrib[1]				 = source_particle_bin.val(_4, source_pidib % config::G_BIN_CAPACITY);
-			contrib[2]				 = source_particle_bin.val(_5, source_pidib % config::G_BIN_CAPACITY);
-			contrib[3]				 = source_particle_bin.val(_6, source_pidib % config::G_BIN_CAPACITY);
-			contrib[4]				 = source_particle_bin.val(_7, source_pidib % config::G_BIN_CAPACITY);
-			contrib[5]				 = source_particle_bin.val(_8, source_pidib % config::G_BIN_CAPACITY);
-			contrib[6]				 = source_particle_bin.val(_9, source_pidib % config::G_BIN_CAPACITY);
-			contrib[7]				 = source_particle_bin.val(_10, source_pidib % config::G_BIN_CAPACITY);
-			contrib[8]				 = source_particle_bin.val(_11, source_pidib % config::G_BIN_CAPACITY);
-			logJp					 = source_particle_bin.val(_12, source_pidib % config::G_BIN_CAPACITY);
-
-			matrix_matrix_multiplication_3d(dws.data_arr(), contrib.data_arr(), F.data_arr());
-			compute_stress_sand(particle_buffer.volume, particle_buffer.mu, particle_buffer.lambda, particle_buffer.cohesion, particle_buffer.beta, particle_buffer.yield_surface, particle_buffer.volume_correction, logJp, F, contrib);
-			{
-				auto particle_bin									  = next_particle_buffer.ch(_0, next_particle_buffer.bin_offsets[src_blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
-				particle_bin.val(_0, particle_id_in_block % config::G_BIN_CAPACITY)  = pos[0];
-				particle_bin.val(_1, particle_id_in_block % config::G_BIN_CAPACITY)  = pos[1];
-				particle_bin.val(_2, particle_id_in_block % config::G_BIN_CAPACITY)  = pos[2];
-				particle_bin.val(_3, particle_id_in_block % config::G_BIN_CAPACITY)  = F[0];
-				particle_bin.val(_4, particle_id_in_block % config::G_BIN_CAPACITY)  = F[1];
-				particle_bin.val(_5, particle_id_in_block % config::G_BIN_CAPACITY)  = F[2];
-				particle_bin.val(_6, particle_id_in_block % config::G_BIN_CAPACITY)  = F[3];
-				particle_bin.val(_7, particle_id_in_block % config::G_BIN_CAPACITY)  = F[4];
-				particle_bin.val(_8, particle_id_in_block % config::G_BIN_CAPACITY)  = F[5];
-				particle_bin.val(_9, particle_id_in_block % config::G_BIN_CAPACITY)  = F[6];
-				particle_bin.val(_10, particle_id_in_block % config::G_BIN_CAPACITY) = F[7];
-				particle_bin.val(_11, particle_id_in_block % config::G_BIN_CAPACITY) = F[8];
-				particle_bin.val(_12, particle_id_in_block % config::G_BIN_CAPACITY) = logJp;
-			}
-
-			contrib = (C * particle_buffer.mass - contrib * new_dt) * config::G_D_INV;
-		}
-
-		local_base_index = get_block_id(pos) - 1;
-		{
-			int dirtag = dir_offset((base_index - 1) / static_cast<int>(config::G_BLOCKSIZE) - (local_base_index - 1) / static_cast<int>(config::G_BLOCKSIZE));
-			next_particle_buffer.add_advection(partition, local_base_index - 1, dirtag, particle_id_in_block);
-			// partition.add_advection(local_base_index - 1, dirtag, particle_id_in_block);
-		}
-		// dws[d] = bspline_weight(local_pos[d]);
-
-#pragma unroll 3
-		for(char dd = 0; dd < 3; ++dd) {
-			local_pos[dd] = pos[dd] - static_cast<float>(local_base_index[dd]) * config::G_DX;
-			float d		  = (local_pos[dd] - (std::round(local_pos[dd] * config::G_DX_INV + 0.5f) - 1.0f) * config::G_DX) * config::G_DX_INV;
-			dws(dd, 0)	  = 0.5f * (1.5f - d) * (1.5f - d);
-			d -= 1.0f;
-			dws(dd, 1) = 0.75f - d * d;
-			d		   = 0.5f + d;
-			dws(dd, 2) = 0.5f * d * d;
-
-			local_base_index[dd] = (((base_index[dd] - 1) & config::G_BLOCKMASK) + 1) + local_base_index[dd] - base_index[dd];
-		}
-#pragma unroll 3
-		for(char i = 0; i < 3; i++) {
-#pragma unroll 3
-			for(char j = 0; j < 3; j++) {
-#pragma unroll 3
-				for(char k = 0; k < 3; k++) {
-					pos		= vec3 {static_cast<float>(i), static_cast<float>(j), static_cast<float>(k)} * config::G_DX - local_pos;
-					float W = dws(0, i) * dws(1, j) * dws(2, k);
-					auto wm = particle_buffer.mass * W;
-					atomicAdd(&p2gbuffer[0][static_cast<size_t>(static_cast<size_t>(local_base_index[0]) + i)][static_cast<size_t>(static_cast<size_t>(local_base_index[1]) + j)][static_cast<size_t>(static_cast<size_t>(local_base_index[2]) + k)], wm);
-					atomicAdd(&p2gbuffer[1][static_cast<size_t>(static_cast<size_t>(local_base_index[0]) + i)][static_cast<size_t>(static_cast<size_t>(local_base_index[1]) + j)][static_cast<size_t>(static_cast<size_t>(local_base_index[2]) + k)], wm * vel[0] + (contrib[0] * pos[0] + contrib[3] * pos[1] + contrib[6] * pos[2]) * W);
-					atomicAdd(&p2gbuffer[2][static_cast<size_t>(static_cast<size_t>(local_base_index[0]) + i)][static_cast<size_t>(static_cast<size_t>(local_base_index[1]) + j)][static_cast<size_t>(static_cast<size_t>(local_base_index[2]) + k)], wm * vel[1] + (contrib[1] * pos[0] + contrib[4] * pos[1] + contrib[7] * pos[2]) * W);
-					atomicAdd(&p2gbuffer[3][static_cast<size_t>(static_cast<size_t>(local_base_index[0]) + i)][static_cast<size_t>(static_cast<size_t>(local_base_index[1]) + j)][static_cast<size_t>(static_cast<size_t>(local_base_index[2]) + k)], wm * vel[2] + (contrib[2] * pos[0] + contrib[5] * pos[1] + contrib[8] * pos[2]) * W);
-				}
-			}
-		}
-	}
-	__syncthreads();
-	/// arena no, channel no, cell no
-	for(int base = static_cast<int>(threadIdx.x); base < NUM_M_VI_IN_ARENA; base += static_cast<int>(blockDim.x)) {
-		char local_block_id = static_cast<char>(base / NUM_M_VI_PER_BLOCK);
-		auto blockno		= partition.query(ivec3 {blockid[0] + ((local_block_id & 4) != 0 ? 1 : 0), blockid[1] + ((local_block_id & 2) != 0 ? 1 : 0), blockid[2] + ((local_block_id & 1) != 0 ? 1 : 0)});
-		// auto grid_block = next_grid.template ch<0>(blockno);
-		int channelid = static_cast<int>(base & (NUM_M_VI_PER_BLOCK - 1));
-		char c		  = static_cast<char>(channelid % config::G_BLOCKVOLUME);
-
-		char cz = static_cast<char>(channelid & config::G_BLOCKMASK);
-		channelid >>= config::G_BLOCKBITS;
-
-		char cy = static_cast<char>(channelid & config::G_BLOCKMASK);
-		channelid >>= config::G_BLOCKBITS;
-
-		char cx = static_cast<char>(channelid & config::G_BLOCKMASK);
-		channelid >>= config::G_BLOCKBITS;
-
-		float val = p2gbuffer[channelid][static_cast<size_t>(static_cast<size_t>(cx) + (local_block_id & 4 ? config::G_BLOCKSIZE : 0))][static_cast<size_t>(static_cast<size_t>(cy) + (local_block_id & 2 ? config::G_BLOCKSIZE : 0))][static_cast<size_t>(static_cast<size_t>(cz) + (local_block_id & 1 ? config::G_BLOCKSIZE : 0))];
-		if(channelid == 0) {
-			atomicAdd(&next_grid.ch(_0, blockno).val_1d(_0, c), val);
-		} else if(channelid == 1) {
-			atomicAdd(&next_grid.ch(_0, blockno).val_1d(_1, c), val);
-		} else if(channelid == 2) {
-			atomicAdd(&next_grid.ch(_0, blockno).val_1d(_2, c), val);
-		} else {
-			atomicAdd(&next_grid.ch(_0, blockno).val_1d(_3, c), val);
-		}
-	}
-}
-
-template<typename Partition, typename Grid>
-__global__ void g2p2g(float dt, float new_dt, const ParticleBuffer<MaterialE::NACC> particle_buffer, ParticleBuffer<MaterialE::NACC> next_particle_buffer, const Partition prev_partition, Partition partition, const Grid grid, Grid next_grid) {
-	static constexpr uint64_t NUM_VI_PER_BLOCK = static_cast<uint64_t>(config::G_BLOCKVOLUME) * 3;
-	static constexpr uint64_t NUM_VI_IN_ARENA  = NUM_VI_PER_BLOCK << 3;
-
-	static constexpr uint64_t NUM_M_VI_PER_BLOCK = static_cast<uint64_t>(config::G_BLOCKVOLUME) * 4;
-	static constexpr uint64_t NUM_M_VI_IN_ARENA	 = NUM_M_VI_PER_BLOCK << 3;
-
-	static constexpr unsigned ARENAMASK = (config::G_BLOCKSIZE << 1) - 1;
-	static constexpr unsigned ARENABITS = config::G_BLOCKBITS + 1;
-
-	using ViArena	  = std::array<std::array<std::array<std::array<float, config::G_BLOCKSIZE << 1>, config::G_BLOCKSIZE << 1>, config::G_BLOCKSIZE << 1>, 3>*;
-	using ViArenaRef  = std::array<std::array<std::array<std::array<float, config::G_BLOCKSIZE << 1>, config::G_BLOCKSIZE << 1>, config::G_BLOCKSIZE << 1>, 3>&;
-	using MViArena	  = std::array<std::array<std::array<std::array<float, config::G_BLOCKSIZE << 1>, config::G_BLOCKSIZE << 1>, config::G_BLOCKSIZE << 1>, 4>*;
-	using MViArenaRef = std::array<std::array<std::array<std::array<float, config::G_BLOCKSIZE << 1>, config::G_BLOCKSIZE << 1>, config::G_BLOCKSIZE << 1>, 4>&;
-
-	static constexpr size_t shared_memory_size = (3 + 4) * (config::G_BLOCKSIZE << 1) *(config::G_BLOCKSIZE << 1) * (config::G_BLOCKSIZE << 1) * sizeof(float);
-	__shared__ char shmem[shared_memory_size];//NOLINT(modernize-avoid-c-arrays, readability-redundant-declaration) Cannot declare runtime size shared memory as std::array; extern has different meaning here
-
-	ViArenaRef __restrict__ g2pbuffer  = *static_cast<ViArena>(static_cast<void*>(static_cast<char*>(shmem)));
-	MViArenaRef __restrict__ p2gbuffer = *static_cast<MViArena>(static_cast<void*>(static_cast<char*>(shmem) + NUM_VI_IN_ARENA * sizeof(float)));
-
-	int src_blockno = static_cast<int>(blockIdx.x);
-	auto blockid	= partition.active_keys[blockIdx.x];
-
-	for(int base = static_cast<int>(threadIdx.x); base < NUM_VI_IN_ARENA; base += static_cast<int>(blockDim.x)) {
-		char local_block_id = static_cast<char>(base / NUM_VI_PER_BLOCK);
-		auto blockno		= partition.query(ivec3 {blockid[0] + ((local_block_id & 4) != 0 ? 1 : 0), blockid[1] + ((local_block_id & 2) != 0 ? 1 : 0), blockid[2] + ((local_block_id & 1) != 0 ? 1 : 0)});
-		auto grid_block		= grid.ch(_0, blockno);
-		int channelid		= static_cast<int>(base % NUM_VI_PER_BLOCK);
-		char c				= static_cast<char>(channelid & 0x3f);
-
-		char cz = static_cast<char>(channelid & config::G_BLOCKMASK);
-		channelid >>= config::G_BLOCKBITS;
-
-		char cy = static_cast<char>(channelid & config::G_BLOCKMASK);
-		channelid >>= config::G_BLOCKBITS;
-
-		char cx = static_cast<char>(channelid & config::G_BLOCKMASK);
-		channelid >>= config::G_BLOCKBITS;
-
-		float val;
-		if(channelid == 0) {
-			val = grid_block.val_1d(_1, c);
-		} else if(channelid == 1) {
-			val = grid_block.val_1d(_2, c);
-		} else {
-			val = grid_block.val_1d(_3, c);
-		}
-		g2pbuffer[channelid][static_cast<size_t>(static_cast<size_t>(cx) + (local_block_id & 4 ? config::G_BLOCKSIZE : 0))][static_cast<size_t>(static_cast<size_t>(cy) + (local_block_id & 2 ? config::G_BLOCKSIZE : 0))][static_cast<size_t>(static_cast<size_t>(cz) + (local_block_id & 1 ? config::G_BLOCKSIZE : 0))] = val;
-	}
-	__syncthreads();
-	for(int base = static_cast<int>(threadIdx.x); base < NUM_M_VI_IN_ARENA; base += static_cast<int>(blockDim.x)) {
-		int loc = static_cast<int>(base);
-		char z	= static_cast<char>(loc & ARENAMASK);
-		loc >>= ARENABITS;
-
-		char y = static_cast<char>(loc & ARENAMASK);
-		loc >>= ARENABITS;
-
-		char x								 = static_cast<char>(loc & ARENAMASK);
-		p2gbuffer[loc >> ARENABITS][x][y][z] = 0.0f;
-	}
-	__syncthreads();
-
-	for(int particle_id_in_block = static_cast<int>(threadIdx.x); particle_id_in_block < next_particle_buffer.particle_bucket_sizes[src_blockno]; particle_id_in_block += static_cast<int>(blockDim.x)) {
-		int advection_source_blockno;
-		int source_pidib;
-		ivec3 base_index;
-		{
-			int advect = next_particle_buffer.blockbuckets[src_blockno * config::G_PARTICLE_NUM_PER_BLOCK + particle_id_in_block];
-			dir_components(advect / config::G_PARTICLE_NUM_PER_BLOCK, base_index);
-			base_index += blockid;
-			advection_source_blockno = prev_partition.query(base_index);
-			source_pidib   = advect & (config::G_PARTICLE_NUM_PER_BLOCK - 1);
-			advection_source_blockno = particle_buffer.bin_offsets[advection_source_blockno] + source_pidib / config::G_BIN_CAPACITY;
-		}
-		vec3 pos;
-		{
-			auto source_particle_bin = particle_buffer.ch(_0, advection_source_blockno);
-			pos[0]					 = source_particle_bin.val(_0, source_pidib % config::G_BIN_CAPACITY);
-			pos[1]					 = source_particle_bin.val(_1, source_pidib % config::G_BIN_CAPACITY);
-			pos[2]					 = source_particle_bin.val(_2, source_pidib % config::G_BIN_CAPACITY);
-		}
-		ivec3 local_base_index = get_block_id(pos) - 1;
-		vec3 local_pos		   = pos - local_base_index * config::G_DX;
-		base_index			   = local_base_index;
-
-		vec3x3 dws;
-#pragma unroll 3
-		for(int dd = 0; dd < 3; ++dd) {
-			float d	   = (local_pos[dd] - (std::round(local_pos[dd] * config::G_DX_INV) - 1.0f) * config::G_DX) * config::G_DX_INV;
-			dws(dd, 0) = 0.5f * (1.5f - d) * (1.5f - d);
-			d -= 1.0f;
-			dws(dd, 1)			 = 0.75f - d * d;
-			d					 = 0.5f + d;
-			dws(dd, 2)			 = 0.5f * d * d;
-			local_base_index[dd] = ((local_base_index[dd] - 1) & config::G_BLOCKMASK) + 1;
-		}
-		vec3 vel;
-		vel.set(0.f);
-		vec9 C;
-		C.set(0.f);
-#pragma unroll 3
-		for(char i = 0; i < 3; i++) {
-#pragma unroll 3
-			for(char j = 0; j < 3; j++) {
-#pragma unroll 3
-				for(char k = 0; k < 3; k++) {
-					vec3 xixp = vec3 {static_cast<float>(i), static_cast<float>(j), static_cast<float>(k)} * config::G_DX - local_pos;
-					float W	  = dws(0, i) * dws(1, j) * dws(2, k);
-					vec3 vi {g2pbuffer[0][static_cast<size_t>(static_cast<size_t>(local_base_index[0]) + i)][static_cast<size_t>(static_cast<size_t>(local_base_index[1]) + j)][static_cast<size_t>(static_cast<size_t>(local_base_index[2]) + k)], g2pbuffer[1][static_cast<size_t>(static_cast<size_t>(local_base_index[0]) + i)][static_cast<size_t>(static_cast<size_t>(local_base_index[1]) + j)][static_cast<size_t>(static_cast<size_t>(local_base_index[2]) + k)], g2pbuffer[2][static_cast<size_t>(static_cast<size_t>(local_base_index[0]) + i)][static_cast<size_t>(static_cast<size_t>(local_base_index[1]) + j)][static_cast<size_t>(static_cast<size_t>(local_base_index[2]) + k)]};
-					vel += vi * W;
-					C[0] += W * vi[0] * xixp[0];
-					C[1] += W * vi[1] * xixp[0];
-					C[2] += W * vi[2] * xixp[0];
-					C[3] += W * vi[0] * xixp[1];
-					C[4] += W * vi[1] * xixp[1];
-					C[5] += W * vi[2] * xixp[1];
-					C[6] += W * vi[0] * xixp[2];
-					C[7] += W * vi[1] * xixp[2];
-					C[8] += W * vi[2] * xixp[2];
-				}
-			}
-		}
-		pos += vel * dt;
-
-#pragma unroll 9
-		for(int d = 0; d < 9; ++d) {
-			dws.val(d) = C[d] * dt * config::G_D_INV + ((d & 0x3) ? 0.f : 1.f);
-		}
-
-		vec9 contrib;
-		{
-			vec9 F;
-			float logJp;
-			auto source_particle_bin = particle_buffer.ch(_0, advection_source_blockno);
-			contrib[0]				 = source_particle_bin.val(_3, source_pidib % config::G_BIN_CAPACITY);
-			contrib[1]				 = source_particle_bin.val(_4, source_pidib % config::G_BIN_CAPACITY);
-			contrib[2]				 = source_particle_bin.val(_5, source_pidib % config::G_BIN_CAPACITY);
-			contrib[3]				 = source_particle_bin.val(_6, source_pidib % config::G_BIN_CAPACITY);
-			contrib[4]				 = source_particle_bin.val(_7, source_pidib % config::G_BIN_CAPACITY);
-			contrib[5]				 = source_particle_bin.val(_8, source_pidib % config::G_BIN_CAPACITY);
-			contrib[6]				 = source_particle_bin.val(_9, source_pidib % config::G_BIN_CAPACITY);
-			contrib[7]				 = source_particle_bin.val(_10, source_pidib % config::G_BIN_CAPACITY);
-			contrib[8]				 = source_particle_bin.val(_11, source_pidib % config::G_BIN_CAPACITY);
-			logJp					 = source_particle_bin.val(_12, source_pidib % config::G_BIN_CAPACITY);
-
-			matrix_matrix_multiplication_3d(dws.data_arr(), contrib.data_arr(), F.data_arr());
-			compute_stress_nacc(particle_buffer.volume, particle_buffer.mu, particle_buffer.lambda, particle_buffer.bm, particle_buffer.xi, particle_buffer.beta, particle_buffer.msqr, particle_buffer.hardening_on, logJp, F, contrib);
-			{
-				auto particle_bin									  = next_particle_buffer.ch(_0, next_particle_buffer.bin_offsets[src_blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
-				particle_bin.val(_0, particle_id_in_block % config::G_BIN_CAPACITY)  = pos[0];
-				particle_bin.val(_1, particle_id_in_block % config::G_BIN_CAPACITY)  = pos[1];
-				particle_bin.val(_2, particle_id_in_block % config::G_BIN_CAPACITY)  = pos[2];
-				particle_bin.val(_3, particle_id_in_block % config::G_BIN_CAPACITY)  = F[0];
-				particle_bin.val(_4, particle_id_in_block % config::G_BIN_CAPACITY)  = F[1];
-				particle_bin.val(_5, particle_id_in_block % config::G_BIN_CAPACITY)  = F[2];
-				particle_bin.val(_6, particle_id_in_block % config::G_BIN_CAPACITY)  = F[3];
-				particle_bin.val(_7, particle_id_in_block % config::G_BIN_CAPACITY)  = F[4];
-				particle_bin.val(_8, particle_id_in_block % config::G_BIN_CAPACITY)  = F[5];
-				particle_bin.val(_9, particle_id_in_block % config::G_BIN_CAPACITY)  = F[6];
-				particle_bin.val(_10, particle_id_in_block % config::G_BIN_CAPACITY) = F[7];
-				particle_bin.val(_11, particle_id_in_block % config::G_BIN_CAPACITY) = F[8];
-				particle_bin.val(_12, particle_id_in_block % config::G_BIN_CAPACITY) = logJp;
-			}
-
-			contrib = (C * particle_buffer.mass - contrib * new_dt) * config::G_D_INV;
-		}
-
-		local_base_index = get_block_id(pos) - 1;
-		{
-			int dirtag = dir_offset((base_index - 1) / static_cast<int>(config::G_BLOCKSIZE) - (local_base_index - 1) / static_cast<int>(config::G_BLOCKSIZE));
-			next_particle_buffer.add_advection(partition, local_base_index - 1, dirtag, particle_id_in_block);
-			// partition.add_advection(local_base_index - 1, dirtag, particle_id_in_block);
-		}
-		// dws[d] = bspline_weight(local_pos[d]);
-
-#pragma unroll 3
-		for(char dd = 0; dd < 3; ++dd) {
-			local_pos[dd] = pos[dd] - static_cast<float>(local_base_index[dd]) * config::G_DX;
-			float d		  = (local_pos[dd] - (std::round(local_pos[dd] * config::G_DX_INV) - 1.0f) * config::G_DX) * config::G_DX_INV;
-			dws(dd, 0)	  = 0.5f * (1.5f - d) * (1.5f - d);
-			d -= 1.0f;
-			dws(dd, 1) = 0.75f - d * d;
-			d		   = 0.5f + d;
-			dws(dd, 2) = 0.5f * d * d;
-
-			local_base_index[dd] = (((base_index[dd] - 1) & config::G_BLOCKMASK) + 1) + local_base_index[dd] - base_index[dd];
-		}
-#pragma unroll 3
-		for(char i = 0; i < 3; i++) {
-#pragma unroll 3
-			for(char j = 0; j < 3; j++) {
-#pragma unroll 3
-				for(char k = 0; k < 3; k++) {
-					pos		= vec3 {static_cast<float>(i), static_cast<float>(j), static_cast<float>(k)} * config::G_DX - local_pos;
-					float W = dws(0, i) * dws(1, j) * dws(2, k);
-					auto wm = particle_buffer.mass * W;
-					atomicAdd(&p2gbuffer[0][static_cast<size_t>(static_cast<size_t>(local_base_index[0]) + i)][static_cast<size_t>(static_cast<size_t>(local_base_index[1]) + j)][static_cast<size_t>(static_cast<size_t>(local_base_index[2]) + k)], wm);
-					atomicAdd(&p2gbuffer[1][static_cast<size_t>(static_cast<size_t>(local_base_index[0]) + i)][static_cast<size_t>(static_cast<size_t>(local_base_index[1]) + j)][static_cast<size_t>(static_cast<size_t>(local_base_index[2]) + k)], wm * vel[0] + (contrib[0] * pos[0] + contrib[3] * pos[1] + contrib[6] * pos[2]) * W);
-					atomicAdd(&p2gbuffer[2][static_cast<size_t>(static_cast<size_t>(local_base_index[0]) + i)][static_cast<size_t>(static_cast<size_t>(local_base_index[1]) + j)][static_cast<size_t>(static_cast<size_t>(local_base_index[2]) + k)], wm * vel[1] + (contrib[1] * pos[0] + contrib[4] * pos[1] + contrib[7] * pos[2]) * W);
-					atomicAdd(&p2gbuffer[3][static_cast<size_t>(static_cast<size_t>(local_base_index[0]) + i)][static_cast<size_t>(static_cast<size_t>(local_base_index[1]) + j)][static_cast<size_t>(static_cast<size_t>(local_base_index[2]) + k)], wm * vel[2] + (contrib[2] * pos[0] + contrib[5] * pos[1] + contrib[8] * pos[2]) * W);
-				}
-			}
-		}
-	}
-	__syncthreads();
-	/// arena no, channel no, cell no
-	for(int base = static_cast<int>(threadIdx.x); base < NUM_M_VI_IN_ARENA; base += static_cast<int>(blockDim.x)) {
-		char local_block_id = static_cast<char>(base / NUM_M_VI_PER_BLOCK);
-		auto blockno		= partition.query(ivec3 {blockid[0] + ((local_block_id & 4) != 0 ? 1 : 0), blockid[1] + ((local_block_id & 2) != 0 ? 1 : 0), blockid[2] + ((local_block_id & 1) != 0 ? 1 : 0)});
-		// auto grid_block = next_grid.template ch<0>(blockno);
-		int channelid = static_cast<int>(base & (NUM_M_VI_PER_BLOCK - 1));
-		char c		  = static_cast<char>(channelid % config::G_BLOCKVOLUME);
-
-		char cz = static_cast<char>(channelid & config::G_BLOCKMASK);
-		channelid >>= config::G_BLOCKBITS;
-
-		char cy = static_cast<char>(channelid & config::G_BLOCKMASK);
-		channelid >>= config::G_BLOCKBITS;
-
-		char cx = static_cast<char>(channelid & config::G_BLOCKMASK);
 		channelid >>= config::G_BLOCKBITS;
 
 		float val = p2gbuffer[channelid][static_cast<size_t>(static_cast<size_t>(cx) + (local_block_id & 4 ? config::G_BLOCKSIZE : 0))][static_cast<size_t>(static_cast<size_t>(cy) + (local_block_id & 2 ? config::G_BLOCKSIZE : 0))][static_cast<size_t>(static_cast<size_t>(cz) + (local_block_id & 1 ? config::G_BLOCKSIZE : 0))];

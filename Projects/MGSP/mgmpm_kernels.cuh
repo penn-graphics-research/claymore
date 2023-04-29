@@ -211,7 +211,7 @@ __global__ void array_to_buffer(ParticleArray particle_array, ParticleBuffer<Mat
 		particle_bin.val(_9, particle_id_in_block % config::G_BIN_CAPACITY)  = 0.f;
 		particle_bin.val(_10, particle_id_in_block % config::G_BIN_CAPACITY) = 0.f;
 		particle_bin.val(_11, particle_id_in_block % config::G_BIN_CAPACITY) = 1.f;
-		/// logJp
+		/// log_jp
 		particle_bin.val(_12, particle_id_in_block % config::G_BIN_CAPACITY) = ParticleBuffer<MaterialE::SAND>::LOG_JP_0;
 	}
 }
@@ -238,7 +238,7 @@ __global__ void array_to_buffer(ParticleArray particle_array, ParticleBuffer<Mat
 		particle_bin.val(_9, particle_id_in_block % config::G_BIN_CAPACITY)  = 0.f;
 		particle_bin.val(_10, particle_id_in_block % config::G_BIN_CAPACITY) = 0.f;
 		particle_bin.val(_11, particle_id_in_block % config::G_BIN_CAPACITY) = 1.f;
-		/// logJp
+		/// log_jp
 		particle_bin.val(_12, particle_id_in_block % config::G_BIN_CAPACITY) = ParticleBuffer<MaterialE::NACC>::LOG_JP_0;
 	}
 }
@@ -1034,7 +1034,7 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 		vec9 contrib;
 		{
 			vec9 F;
-			float logJp;
+			float log_jp;
 			auto source_particle_bin = particle_buffer.ch(_0, advection_source_blockno);
 			contrib[0]				 = source_particle_bin.val(_3, source_pidib % config::G_BIN_CAPACITY);
 			contrib[1]				 = source_particle_bin.val(_4, source_pidib % config::G_BIN_CAPACITY);
@@ -1045,10 +1045,10 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 			contrib[6]				 = source_particle_bin.val(_9, source_pidib % config::G_BIN_CAPACITY);
 			contrib[7]				 = source_particle_bin.val(_10, source_pidib % config::G_BIN_CAPACITY);
 			contrib[8]				 = source_particle_bin.val(_11, source_pidib % config::G_BIN_CAPACITY);
-			logJp					 = source_particle_bin.val(_12, source_pidib % config::G_BIN_CAPACITY);
+			log_jp					 = source_particle_bin.val(_12, source_pidib % config::G_BIN_CAPACITY);
 
 			matrix_matrix_multiplication_3d(dws.data_arr(), contrib.data_arr(), F.data_arr());
-			compute_stress_sand(particle_buffer.volume, particle_buffer.mu, particle_buffer.lambda, particle_buffer.cohesion, particle_buffer.beta, particle_buffer.yield_surface, particle_buffer.volume_correction, logJp, F, contrib);
+			compute_stress_sand(particle_buffer.volume, particle_buffer.mu, particle_buffer.lambda, particle_buffer.cohesion, particle_buffer.beta, particle_buffer.yield_surface, particle_buffer.volume_correction, log_jp, F, contrib);
 			{
 				auto particle_bin									  = next_particle_buffer.ch(_0, partition.bin_offsets[src_blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
 				particle_bin.val(_0, particle_id_in_block % config::G_BIN_CAPACITY)  = pos[0];
@@ -1063,7 +1063,7 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 				particle_bin.val(_9, particle_id_in_block % config::G_BIN_CAPACITY)  = F[6];
 				particle_bin.val(_10, particle_id_in_block % config::G_BIN_CAPACITY) = F[7];
 				particle_bin.val(_11, particle_id_in_block % config::G_BIN_CAPACITY) = F[8];
-				particle_bin.val(_12, particle_id_in_block % config::G_BIN_CAPACITY) = logJp;
+				particle_bin.val(_12, particle_id_in_block % config::G_BIN_CAPACITY) = log_jp;
 			}
 
 			contrib = (C * particle_buffer.mass - contrib * new_dt) * config::G_D_INV;
@@ -1285,7 +1285,7 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 		vec9 contrib;
 		{
 			vec9 F;
-			float logJp;
+			float log_jp;
 			auto source_particle_bin = particle_buffer.ch(_0, advection_source_blockno);
 			contrib[0]				 = source_particle_bin.val(_3, source_pidib % config::G_BIN_CAPACITY);
 			contrib[1]				 = source_particle_bin.val(_4, source_pidib % config::G_BIN_CAPACITY);
@@ -1296,10 +1296,10 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 			contrib[6]				 = source_particle_bin.val(_9, source_pidib % config::G_BIN_CAPACITY);
 			contrib[7]				 = source_particle_bin.val(_10, source_pidib % config::G_BIN_CAPACITY);
 			contrib[8]				 = source_particle_bin.val(_11, source_pidib % config::G_BIN_CAPACITY);
-			logJp					 = source_particle_bin.val(_12, source_pidib % config::G_BIN_CAPACITY);
+			log_jp					 = source_particle_bin.val(_12, source_pidib % config::G_BIN_CAPACITY);
 
 			matrix_matrix_multiplication_3d(dws.data_arr(), contrib.data_arr(), F.data_arr());
-			compute_stress_nacc(particle_buffer.volume, particle_buffer.mu, particle_buffer.lambda, particle_buffer.bm, particle_buffer.xi, particle_buffer.beta, particle_buffer.msqr, particle_buffer.hardening_on, logJp, F, contrib);
+			compute_stress_nacc(particle_buffer.volume, particle_buffer.mu, particle_buffer.lambda, particle_buffer.bm, particle_buffer.xi, particle_buffer.beta, particle_buffer.msqr, particle_buffer.hardening_on, log_jp, F, contrib);
 			{
 				auto particle_bin									  = next_particle_buffer.ch(_0, partition.bin_offsets[src_blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
 				particle_bin.val(_0, particle_id_in_block % config::G_BIN_CAPACITY)  = pos[0];
@@ -1314,7 +1314,7 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 				particle_bin.val(_9, particle_id_in_block % config::G_BIN_CAPACITY)  = F[6];
 				particle_bin.val(_10, particle_id_in_block % config::G_BIN_CAPACITY) = F[7];
 				particle_bin.val(_11, particle_id_in_block % config::G_BIN_CAPACITY) = F[8];
-				particle_bin.val(_12, particle_id_in_block % config::G_BIN_CAPACITY) = logJp;
+				particle_bin.val(_12, particle_id_in_block % config::G_BIN_CAPACITY) = log_jp;
 			}
 
 			contrib = (C * particle_buffer.mass - contrib * new_dt) * config::G_D_INV;

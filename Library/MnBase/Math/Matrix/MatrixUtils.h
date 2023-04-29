@@ -270,18 +270,19 @@ constexpr void matrix_matrix_tranpose_multiplication_3d(const std::array<T, 9>& 
 
 template<typename T>
 constexpr void matrix_deviatoric_3d(const std::array<T, 9>& in, std::array<T, 9>& out) {
-	T trace_in_div_d = (in[0] + in[4] + in[8]) / 3.f;
-	out[0]			 = in[0] - trace_in_div_d;
+	//FIXME: Rewrote this, cause for some reasons sometimes precision errors occured (Probably compiler bug)
+	//T trace_in_div_d = (in[0] + in[4] + in[8]) / static_cast<T>(3.0);
+	out[0]			 = in[0] * static_cast<T>(2.0/3.0) - (in[4] + in[8]) / static_cast<T>(3.0);
 	out[1]			 = in[1];
 	out[2]			 = in[2];
 
 	out[3] = in[3];
-	out[4] = in[4] - trace_in_div_d;
+	out[4] = in[4] * static_cast<T>(2.0/3.0) - (in[0] + in[8]) / static_cast<T>(3.0);
 	out[5] = in[5];
 
 	out[6] = in[6];
 	out[7] = in[7];
-	out[8] = in[8] - trace_in_div_d;
+	out[8] = in[8] * static_cast<T>(2.0/3.0) - (in[0] + in[4]) / static_cast<T>(3.0);
 }
 
 #if 0

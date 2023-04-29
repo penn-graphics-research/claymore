@@ -154,6 +154,7 @@ class Cuda : public ManagedSingleton<Cuda> {
 			Func&& f,
 			Arguments... args
 		) {///< launch on the current device
+			static_assert(!std::disjunction<std::is_reference<Arguments>...>::value, "Cannot pass values to Cuda kernels by reference");
 			/// compiler will handle type conversions
 			if(lc.dg.x && lc.dg.y && lc.dg.z && lc.db.x && lc.db.y && lc.db.z) {
 				std::forward<Func>(f)<<<lc.dg, lc.db, lc.shmem, stream<StreamIndex::COMPUTE>()>>>(args...);
@@ -170,6 +171,7 @@ class Cuda : public ManagedSingleton<Cuda> {
 			void (*f)(Arguments...),
 			Arguments... args
 		) {///< launch on the current device
+			static_assert(!std::disjunction<std::is_reference<Arguments>...>::value, "Cannot pass values to Cuda kernels by reference");
 			/// compiler will handle type conversions
 			if(lc.dg.x && lc.dg.y && lc.dg.z && lc.db.x && lc.db.y && lc.db.z) {
 				f<<<lc.dg, lc.db, lc.shmem, stream<StreamIndex::COMPUTE>()>>>(args...);
@@ -188,6 +190,7 @@ class Cuda : public ManagedSingleton<Cuda> {
 			Func&& f,
 			Arguments... args
 		) {///< launch on the current device
+			static_assert(!std::disjunction<std::is_reference<Arguments>...>::value, "Cannot pass values to Cuda kernels by reference");
 			/// compiler will handle type conversions
 			if(lc.dg.x && lc.dg.y && lc.dg.z && lc.db.x && lc.db.y && lc.db.z) {
 				std::forward<Func>(f)<<<lc.dg, lc.db, lc.shmem, stream_spare(sid)>>>(std::forward<Arguments>(args)...);
@@ -205,6 +208,7 @@ class Cuda : public ManagedSingleton<Cuda> {
 			void (*f)(Arguments...),
 			Arguments... args
 		) {///< launch on the current device
+			static_assert(!std::disjunction<std::is_reference<Arguments>...>::value, "Cannot pass values to Cuda kernels by reference");
 			/// compiler will handle type conversions
 			if(lc.dg.x && lc.dg.y && lc.dg.z && lc.db.x && lc.db.y && lc.db.z) {
 				f<<<lc.dg, lc.db, lc.shmem, stream_spare(sid)>>>(std::forward<Arguments>(args)...);
@@ -231,6 +235,7 @@ class Cuda : public ManagedSingleton<Cuda> {
 			void (*f)(Arguments...),
 			Arguments... args
 		) {///< launch on the current device
+			static_assert(!std::disjunction<std::is_reference<Arguments>...>::value, "Cannot pass values to Cuda kernels by reference");
 			if(lc.dg.x && lc.dg.y && lc.dg.z && lc.db.x && lc.db.y && lc.db.z) {
 				f<<<lc.dg, lc.db, lc.shmem, stream<sid>()>>>(std::forward<Arguments>(args)...);
 				cudaError_t error = cudaGetLastError();

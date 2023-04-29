@@ -130,7 +130,7 @@ struct MgspBenchmark {
 	std::array<std::size_t, config::G_DEVICE_COUNT> cur_num_active_bins				  = {};
 	std::array<std::array<std::size_t, BIN_COUNT>, config::G_DEVICE_COUNT> checked_counts = {};
 	vec<float, config::G_DEVICE_COUNT> max_vels;
-	vec<int, config::G_DEVICE_COUNT> partition_block_counts;
+	vec<int, config::G_DEVICE_COUNT> partition_block_count;
 	vec<int, config::G_DEVICE_COUNT> nbcount;
 	vec<int, config::G_DEVICE_COUNT> exterior_block_count;
 	vec<int, config::G_DEVICE_COUNT> bincount;	 ///< num blocks
@@ -454,7 +454,7 @@ struct MgspBenchmark {
 
 					timer.tick();
 					match(particle_bins[rollid][did])([this, &did, &cu_dev](const auto& particle_buffer) {
-						cu_dev.compute_launch({partition_block_counts[did], 128, (512 * 3 * 4) + (512 * 4 * 4)}, g2p2g, dt, next_dt, static_cast<const ivec3*>(nullptr), particle_buffer, get<typename std::decay_t<decltype(particle_buffer)>>(particle_bins[rollid ^ 1][did]), partitions[rollid ^ 1][did], partitions[rollid][did], grid_blocks[0][did], grid_blocks[1][did]);
+						cu_dev.compute_launch({partition_block_count[did], 128, (512 * 3 * 4) + (512 * 4 * 4)}, g2p2g, dt, next_dt, static_cast<const ivec3*>(nullptr), particle_buffer, get<typename std::decay_t<decltype(particle_buffer)>>(particle_bins[rollid ^ 1][did]), partitions[rollid ^ 1][did], partitions[rollid][did], grid_blocks[0][did], grid_blocks[1][did]);
 					});
 					timer.tock(fmt::format("GPU[{}] frame {} step {} non_halo_g2p2g", did, cur_frame, cur_step));
 					if(checked_counts[did][0] > 0) {
@@ -484,26 +484,26 @@ struct MgspBenchmark {
 					/// building new partition
 					// block count
 					check_cuda_errors(cudaMemcpyAsync(partitions[rollid ^ 1][did].count, destinations + exterior_block_count[did], sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
-					check_cuda_errors(cudaMemcpyAsync(&partition_block_counts[did], destinations + exterior_block_count[did], sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
+					check_cuda_errors(cudaMemcpyAsync(&partition_block_count[did], destinations + exterior_block_count[did], sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
 					cu_dev.compute_launch({(exterior_block_count[did] + 255) / 256, 256}, exclusive_scan_inverse, exterior_block_count[did], static_cast<const int*>(destinations), sources);
 					// indextable, activeKeys, particle_bucket_size, buckets
 					partitions[rollid ^ 1][did].reset_table(cu_dev.stream_compute());
 					cu_dev.syncStream<streamIdx::COMPUTE>();
-					cu_dev.compute_launch({partition_block_counts[did], 128}, update_partition, static_cast<uint32_t>(partition_block_counts[did]), static_cast<const int*>(sources), partitions[rollid][did], partitions[rollid ^ 1][did]);
+					cu_dev.compute_launch({partition_block_count[did], 128}, update_partition, static_cast<uint32_t>(partition_block_count[did]), static_cast<const int*>(sources), partitions[rollid][did], partitions[rollid ^ 1][did]);
 					// bin_offsets
 					{
 						int* bin_sizes = tmps[did].bin_sizes;
-						cu_dev.compute_launch({(partition_block_counts[did] + 1 + 127) / 128, 128}, compute_bin_capacity, partition_block_counts[did] + 1, static_cast<const int*>(partitions[rollid ^ 1][did].particle_bucket_sizes), bin_sizes);
-						exclusive_scan(partition_block_counts[did] + 1, bin_sizes, partitions[rollid ^ 1][did].bin_offsets, cu_dev);
-						check_cuda_errors(cudaMemcpyAsync(&bincount[did], partitions[rollid ^ 1][did].bin_offsets + partition_block_counts[did], sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
+						cu_dev.compute_launch({(partition_block_count[did] + 1 + 127) / 128, 128}, compute_bin_capacity, partition_block_count[did] + 1, static_cast<const int*>(partitions[rollid ^ 1][did].particle_bucket_sizes), bin_sizes);
+						exclusive_scan(partition_block_count[did] + 1, bin_sizes, partitions[rollid ^ 1][did].bin_offsets, cu_dev);
+						check_cuda_errors(cudaMemcpyAsync(&bincount[did], partitions[rollid ^ 1][did].bin_offsets + partition_block_count[did], sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
 						cu_dev.syncStream<streamIdx::COMPUTE>();
 					}
 					timer.tock(fmt::format("GPU[{}] frame {} step {} update_partition", did, cur_frame, cur_step));
 
 					/// neighboring blocks
 					timer.tick();
-					cu_dev.compute_launch({(partition_block_counts[did] + 127) / 128, 128}, register_neighbor_blocks, static_cast<uint32_t>(partition_block_counts[did]), partitions[rollid ^ 1][did]);
-					auto prev_nbcount = nbcount[did];
+					cu_dev.compute_launch({(partition_block_count[did] + 127) / 128, 128}, register_neighbor_blocks, static_cast<uint32_t>(partition_block_count[did]), partitions[rollid ^ 1][did]);
+					auto prev_neighbor_block_count = nbcount[did];
 					check_cuda_errors(cudaMemcpyAsync(&nbcount[did], partitions[rollid ^ 1][did].count, sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
 					cu_dev.syncStream<streamIdx::COMPUTE>();
 					timer.tock(fmt::format("GPU[{}] frame {} step {} build_partition_for_grid", did, cur_frame, cur_step));
@@ -515,7 +515,7 @@ struct MgspBenchmark {
 					/// rearrange grid blocks
 					timer.tick();
 					grid_blocks[0][did].reset(exterior_block_count[did], cu_dev);
-					cu_dev.compute_launch({prev_nbcount, config::G_BLOCKVOLUME}, copy_selected_grid_blocks, static_cast<const ivec3*>(partitions[rollid][did].active_keys), partitions[rollid ^ 1][did], static_cast<const int*>(active_block_marks), grid_blocks[1][did], grid_blocks[0][did]);
+					cu_dev.compute_launch({prev_neighbor_block_count, config::G_BLOCKVOLUME}, copy_selected_grid_blocks, static_cast<const ivec3*>(partitions[rollid][did].active_keys), partitions[rollid ^ 1][did], static_cast<const int*>(active_block_marks), grid_blocks[1][did], grid_blocks[0][did]);
 					cu_dev.syncStream<streamIdx::COMPUTE>();
 					timer.tock(fmt::format("GPU[{}] frame {} step {} copy_grid_blocks", did, cur_frame, cur_step));
 					/// check capacity
@@ -535,10 +535,10 @@ struct MgspBenchmark {
 
 					timer.tick();
 					/// exterior blocks
-					cu_dev.compute_launch({(partition_block_counts[did] + 127) / 128, 128}, register_exterior_blocks, static_cast<uint32_t>(partition_block_counts[did]), partitions[rollid ^ 1][did]);
+					cu_dev.compute_launch({(partition_block_count[did] + 127) / 128, 128}, register_exterior_blocks, static_cast<uint32_t>(partition_block_count[did]), partitions[rollid ^ 1][did]);
 					check_cuda_errors(cudaMemcpyAsync(&exterior_block_count[did], partitions[rollid ^ 1][did].count, sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
 					cu_dev.syncStream<streamIdx::COMPUTE>();
-					fmt::print(fmt::emphasis::bold | fg(fmt::color::yellow), "block count on device {}: {}, {}, {} [{}]; {} [{}]\n", did, partition_block_counts[did], nbcount[did], exterior_block_count[did], cur_num_active_blocks[did], bincount[did], cur_num_active_bins[did]);
+					fmt::print(fmt::emphasis::bold | fg(fmt::color::yellow), "block count on device {}: {}, {}, {} [{}]; {} [{}]\n", did, partition_block_count[did], nbcount[did], exterior_block_count[did], cur_num_active_blocks[did], bincount[did], cur_num_active_bins[did]);
 					timer.tock(fmt::format("GPU[{}] frame {} step {} build_partition_for_particles", did, cur_frame, cur_step));
 				});
 				sync();
@@ -571,7 +571,7 @@ struct MgspBenchmark {
 		int* d_particle_count = static_cast<int*>(cu_dev.borrow(sizeof(int)));
 		check_cuda_errors(cudaMemsetAsync(d_particle_count, 0, sizeof(int), cu_dev.stream_compute()));
 		match(particle_bins[rollid][did])([this, &cu_dev, &did, &d_particle_count](const auto& particle_buffer) {
-			cu_dev.compute_launch({partition_block_counts[did], 128}, retrieve_particle_buffer, partitions[rollid][did], partitions[rollid ^ 1][did], particle_buffer, particles[did], d_particle_count);
+			cu_dev.compute_launch({partition_block_count[did], 128}, retrieve_particle_buffer, partitions[rollid][did], partitions[rollid ^ 1][did], particle_buffer, particles[did], d_particle_count);
 		});
 		check_cuda_errors(cudaMemcpyAsync(&particle_count, d_particle_count, sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
 		cu_dev.syncStream<streamIdx::COMPUTE>();
@@ -597,7 +597,7 @@ struct MgspBenchmark {
 			CudaTimer timer {cu_dev.stream_compute()};
 			timer.tick();
 			cu_dev.compute_launch({(particle_counts[did] + 255) / 256, 256}, activate_blocks, particle_counts[did], particles[did], partitions[rollid ^ 1][did]);
-			check_cuda_errors(cudaMemcpyAsync(&partition_block_counts[did], partitions[rollid ^ 1][did].count, sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
+			check_cuda_errors(cudaMemcpyAsync(&partition_block_count[did], partitions[rollid ^ 1][did].count, sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
 			timer.tock(fmt::format("GPU[{}] step {} init_table", did, cur_step));
 
 			timer.tick();
@@ -606,27 +606,27 @@ struct MgspBenchmark {
 			cu_dev.compute_launch({(particle_counts[did] + 255) / 256, 256}, build_particle_cell_buckets, particle_counts[did], particles[did], partitions[rollid ^ 1][did]);
 			// bucket, bin_offsets
 			cu_dev.syncStream<streamIdx::COMPUTE>();
-			partitions[rollid ^ 1][did].build_particle_buckets(cu_dev, partition_block_counts[did]);
+			partitions[rollid ^ 1][did].build_particle_buckets(cu_dev, partition_block_count[did]);
 			{
 				int* bin_sizes = tmps[did].bin_sizes;
-				cu_dev.compute_launch({(partition_block_counts[did] + 1 + 127) / 128, 128}, compute_bin_capacity, partition_block_counts[did] + 1, static_cast<const int*>(partitions[rollid ^ 1][did].particle_bucket_sizes), bin_sizes);
-				exclusive_scan(partition_block_counts[did] + 1, bin_sizes, partitions[rollid ^ 1][did].bin_offsets, cu_dev);
-				check_cuda_errors(cudaMemcpyAsync(&bincount[did], partitions[rollid ^ 1][did].bin_offsets + partition_block_counts[did], sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
+				cu_dev.compute_launch({(partition_block_count[did] + 1 + 127) / 128, 128}, compute_bin_capacity, partition_block_count[did] + 1, static_cast<const int*>(partitions[rollid ^ 1][did].particle_bucket_sizes), bin_sizes);
+				exclusive_scan(partition_block_count[did] + 1, bin_sizes, partitions[rollid ^ 1][did].bin_offsets, cu_dev);
+				check_cuda_errors(cudaMemcpyAsync(&bincount[did], partitions[rollid ^ 1][did].bin_offsets + partition_block_count[did], sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
 				cu_dev.syncStream<streamIdx::COMPUTE>();
 			}
 			match(particle_bins[rollid][did])([this, &cu_dev, &did](const auto& particle_buffer) {
-				cu_dev.compute_launch({partition_block_counts[did], 128}, array_to_buffer, particles[did], particle_buffer, partitions[rollid ^ 1][did]);
+				cu_dev.compute_launch({partition_block_count[did], 128}, array_to_buffer, particles[did], particle_buffer, partitions[rollid ^ 1][did]);
 			});
 			// grid block
-			cu_dev.compute_launch({(partition_block_counts[did] + 127) / 128, 128}, register_neighbor_blocks, static_cast<uint32_t>(partition_block_counts[did]), partitions[rollid ^ 1][did]);
+			cu_dev.compute_launch({(partition_block_count[did] + 127) / 128, 128}, register_neighbor_blocks, static_cast<uint32_t>(partition_block_count[did]), partitions[rollid ^ 1][did]);
 			check_cuda_errors(cudaMemcpyAsync(&nbcount[did], partitions[rollid ^ 1][did].count, sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
 			cu_dev.syncStream<streamIdx::COMPUTE>();
-			cu_dev.compute_launch({(partition_block_counts[did] + 127) / 128, 128}, register_exterior_blocks, static_cast<uint32_t>(partition_block_counts[did]), partitions[rollid ^ 1][did]);
+			cu_dev.compute_launch({(partition_block_count[did] + 127) / 128, 128}, register_exterior_blocks, static_cast<uint32_t>(partition_block_count[did]), partitions[rollid ^ 1][did]);
 			check_cuda_errors(cudaMemcpyAsync(&exterior_block_count[did], partitions[rollid ^ 1][did].count, sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
 			cu_dev.syncStream<streamIdx::COMPUTE>();
 			timer.tock(fmt::format("GPU[{}] step {} init_partition", did, cur_step));
 
-			fmt::print(fmt::emphasis::bold | fg(fmt::color::yellow), "block count on device {}: {}, {}, {} [{}]; {} [{}]\n", did, partition_block_counts[did], nbcount[did], exterior_block_count[did], cur_num_active_blocks[did], bincount[did], cur_num_active_bins[did]);
+			fmt::print(fmt::emphasis::bold | fg(fmt::color::yellow), "block count on device {}: {}, {}, {} [{}]; {} [{}]\n", did, partition_block_count[did], nbcount[did], exterior_block_count[did], cur_num_active_blocks[did], bincount[did], cur_num_active_bins[did]);
 		});
 		sync();
 
@@ -644,7 +644,7 @@ struct MgspBenchmark {
 			timer.tick();
 			grid_blocks[0][did].reset(nbcount[did], cu_dev);
 			cu_dev.compute_launch({(particle_counts[did] + 255) / 256, 256}, rasterize, particle_counts[did], particles[did], grid_blocks[0][did], partitions[rollid][did], dt, get_mass(did));
-			cu_dev.compute_launch({partition_block_counts[did], 128}, init_adv_bucket, static_cast<const int*>(partitions[rollid][did].particle_bucket_sizes), partitions[rollid][did].blockbuckets);
+			cu_dev.compute_launch({partition_block_count[did], 128}, init_adv_bucket, static_cast<const int*>(partitions[rollid][did].particle_bucket_sizes), partitions[rollid][did].blockbuckets);
 			cu_dev.syncStream<streamIdx::COMPUTE>();
 			timer.tock(fmt::format("GPU[{}] step {} init_grid", did, cur_step));
 		});
@@ -704,7 +704,7 @@ struct MgspBenchmark {
 			}
 			// self halo particle block
 			partitions[rollid ^ 1][did].reset_halo_count(cu_dev.stream_compute());
-			cu_dev.compute_launch({(partition_block_counts[did] + 127) / 128, 128}, collect_blockids_for_halo_reduction, static_cast<uint32_t>(partition_block_counts[did]), did, partitions[rollid ^ 1][did]);
+			cu_dev.compute_launch({(partition_block_count[did] + 127) / 128, 128}, collect_blockids_for_halo_reduction, static_cast<uint32_t>(partition_block_count[did]), did, partitions[rollid ^ 1][did]);
 			/// retrieve counts
 			partitions[rollid ^ 1][did].retrieve_halo_count(cu_dev.stream_compute());
 			output_halo_grid_blocks[did].retrieve_counts(cu_dev.stream_compute());

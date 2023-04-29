@@ -108,7 +108,7 @@ struct GmpmSimulator {
 	std::array<std::size_t, BIN_COUNT> checked_counts = {};
 	std::vector<std::size_t> checked_bin_counts		= {};
 	float max_vels;
-	int partition_block_counts;
+	int partition_block_count;
 	int neighbor_block_count;
 	int exterior_block_count;///< num blocks
 	std::vector<int> bincount										 = {};
@@ -131,7 +131,7 @@ struct GmpmSimulator {
 		, tmps()
 		, cur_num_active_blocks()
 		, max_vels()
-		, partition_block_counts()
+		, partition_block_count()
 		, neighbor_block_count()
 		, exterior_block_count() {
 		// data
@@ -394,7 +394,7 @@ struct GmpmSimulator {
 						
 						//Perform g2p2g
 						match(particle_bins[rollid][i])([this, &cu_dev, &i](const auto& particle_buffer) {
-							cu_dev.compute_launch({partition_block_counts, 128}, g2p2g, dt, next_dt, particle_buffer, get<typename std::decay_t<decltype(particle_buffer)>>(particle_bins[rollid ^ 1][i]), partitions[rollid ^ 1], partitions[rollid], grid_blocks[0], grid_blocks[1]);
+							cu_dev.compute_launch({partition_block_count, 128}, g2p2g, dt, next_dt, particle_buffer, get<typename std::decay_t<decltype(particle_buffer)>>(particle_bins[rollid ^ 1][i]), partitions[rollid ^ 1], partitions[rollid], grid_blocks[0], grid_blocks[1]);
 						});
 					}
 					cu_dev.syncStream<streamIdx::COMPUTE>();
@@ -458,7 +458,7 @@ struct GmpmSimulator {
 					
 					//Store new bucket count
 					check_cuda_errors(cudaMemcpyAsync(partitions[rollid ^ 1].count, destinations + exterior_block_count, sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
-					check_cuda_errors(cudaMemcpyAsync(&partition_block_counts, destinations + exterior_block_count, sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
+					check_cuda_errors(cudaMemcpyAsync(&partition_block_count, destinations + exterior_block_count, sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
 					
 					//Calculate indices of block by position
 					cu_dev.compute_launch({(exterior_block_count + 255) / 256, 256}, exclusive_scan_inverse, exterior_block_count, static_cast<const int*>(destinations), sources);
@@ -468,14 +468,20 @@ struct GmpmSimulator {
 					partitions[rollid ^ 1].reset_table(cu_dev.stream_compute());
 					cu_dev.syncStream<streamIdx::COMPUTE>();
 					
+					//Check size
+					if(partition_block_count > config::G_MAX_ACTIVE_BLOCK){
+						std::cerr << "Too much active blocks: " << partition_block_count << std::endl;
+						std::abort();
+					}
+					
 					//Reinsert buckets
-					cu_dev.compute_launch({(partition_block_counts + 127) / 128, 128}, update_partition, static_cast<uint32_t>(partition_block_counts), static_cast<const int*>(sources), partitions[rollid], partitions[rollid ^ 1]);
+					cu_dev.compute_launch({(partition_block_count + 127) / 128, 128}, update_partition, static_cast<uint32_t>(partition_block_count), static_cast<const int*>(sources), partitions[rollid], partitions[rollid ^ 1]);
 					
 					//Copy block buckets and sizes from next particle buffer to current particle buffer
 					for(int i = 0; i < get_model_count(); ++i) {
 						match(particle_bins[rollid ^ 1][i])([this, &cu_dev, &sources, &i](auto& particle_buffer) {
 							auto& next_particle_buffer = get<typename std::decay_t<decltype(particle_buffer)>>(particle_bins[rollid][i]);
-							cu_dev.compute_launch({partition_block_counts, 128}, update_buckets, static_cast<uint32_t>(partition_block_counts), static_cast<const int*>(sources), particle_buffer, next_particle_buffer);
+							cu_dev.compute_launch({partition_block_count, 128}, update_buckets, static_cast<uint32_t>(partition_block_count), static_cast<const int*>(sources), particle_buffer, next_particle_buffer);
 						});
 					}
 					
@@ -483,13 +489,13 @@ struct GmpmSimulator {
 					int* bin_sizes = tmps.bin_sizes;
 					for(int i = 0; i < get_model_count(); ++i) {
 						match(particle_bins[rollid][i])([this, &cu_dev, &bin_sizes, &i](auto& particle_buffer) {
-							cu_dev.compute_launch({(partition_block_counts + 1 + 127) / 128, 128}, compute_bin_capacity, partition_block_counts + 1, static_cast<const int*>(particle_buffer.particle_bucket_sizes), bin_sizes);
+							cu_dev.compute_launch({(partition_block_count + 1 + 127) / 128, 128}, compute_bin_capacity, partition_block_count + 1, static_cast<const int*>(particle_buffer.particle_bucket_sizes), bin_sizes);
 							
 							//Stores aggregated bin sizes in particle_buffer 
-							exclusive_scan(partition_block_counts + 1, bin_sizes, particle_buffer.bin_offsets, cu_dev);
+							exclusive_scan(partition_block_count + 1, bin_sizes, particle_buffer.bin_offsets, cu_dev);
 							
 							//Stores last aggregated size == whole size in bincount
-							check_cuda_errors(cudaMemcpyAsync(&bincount[i], particle_buffer.bin_offsets + partition_block_counts, sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
+							check_cuda_errors(cudaMemcpyAsync(&bincount[i], particle_buffer.bin_offsets + partition_block_count, sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
 							cu_dev.syncStream<streamIdx::COMPUTE>();
 						});
 					}
@@ -499,12 +505,18 @@ struct GmpmSimulator {
 					timer.tick();
 					
 					//Activate blocks near active blocks
-					cu_dev.compute_launch({(partition_block_counts + 127) / 128, 128}, register_neighbor_blocks, static_cast<uint32_t>(partition_block_counts), partitions[rollid ^ 1]);
+					cu_dev.compute_launch({(partition_block_count + 127) / 128, 128}, register_neighbor_blocks, static_cast<uint32_t>(partition_block_count), partitions[rollid ^ 1]);
 					
 					//Retrieve total count
-					auto prev_nbcount = neighbor_block_count;
+					auto prev_neighbor_block_count = neighbor_block_count;
 					check_cuda_errors(cudaMemcpyAsync(&neighbor_block_count, partitions[rollid ^ 1].count, sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
 					cu_dev.syncStream<streamIdx::COMPUTE>();
+					
+					//Check size
+					if(neighbor_block_count > config::G_MAX_ACTIVE_BLOCK){
+						std::cerr << "Too much neighbour blocks: " << partition_block_count << std::endl;
+						std::abort();
+					}
 					
 					timer.tock(fmt::format("GPU[{}] frame {} step {} build_partition_for_grid", gpuid, cur_frame, cur_step));
 
@@ -519,7 +531,7 @@ struct GmpmSimulator {
 					grid_blocks[0].reset(exterior_block_count, cu_dev);
 					
 					//Copy values from old grid for active blocks
-					cu_dev.compute_launch({prev_nbcount, config::G_BLOCKVOLUME}, copy_selected_grid_blocks, static_cast<const ivec3*>(partitions[rollid].active_keys), partitions[rollid ^ 1], static_cast<const int*>(active_block_marks), grid_blocks[1], grid_blocks[0]);
+					cu_dev.compute_launch({prev_neighbor_block_count, config::G_BLOCKVOLUME}, copy_selected_grid_blocks, static_cast<const ivec3*>(partitions[rollid].active_keys), partitions[rollid ^ 1], static_cast<const int*>(active_block_marks), grid_blocks[1], grid_blocks[0]);
 					cu_dev.syncStream<streamIdx::COMPUTE>();
 					
 					timer.tock(fmt::format("GPU[{}] frame {} step {} copy_grid_blocks", gpuid, cur_frame, cur_step));
@@ -538,13 +550,19 @@ struct GmpmSimulator {
 					timer.tick();
 					
 					//Activate blocks near active blocks, including those before that block
-					cu_dev.compute_launch({(partition_block_counts + 127) / 128, 128}, register_exterior_blocks, static_cast<uint32_t>(partition_block_counts), partitions[rollid ^ 1]);
+					cu_dev.compute_launch({(partition_block_count + 127) / 128, 128}, register_exterior_blocks, static_cast<uint32_t>(partition_block_count), partitions[rollid ^ 1]);
 					
 					//Retrieve total count
 					check_cuda_errors(cudaMemcpyAsync(&exterior_block_count, partitions[rollid ^ 1].count, sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
 					cu_dev.syncStream<streamIdx::COMPUTE>();
+					
+					//Check size
+					if(exterior_block_count > config::G_MAX_ACTIVE_BLOCK){
+						std::cerr << "Too much exterior blocks: " << partition_block_count << std::endl;
+						std::abort();
+					}
 
-					fmt::print(fmt::emphasis::bold | fg(fmt::color::yellow), "block count on device {}: {}, {}, {} [{}]\n", gpuid, partition_block_counts, neighbor_block_count, exterior_block_count, cur_num_active_blocks);
+					fmt::print(fmt::emphasis::bold | fg(fmt::color::yellow), "block count on device {}: {}, {}, {} [{}]\n", gpuid, partition_block_count, neighbor_block_count, exterior_block_count, cur_num_active_blocks);
 					for(int i = 0; i < get_model_count(); ++i) {
 						fmt::print(fmt::emphasis::bold | fg(fmt::color::yellow), "bin count on device {}: model {}: {} [{}]\n", gpuid, i, bincount[i], cur_num_active_bins[i]);
 					}
@@ -584,7 +602,7 @@ struct GmpmSimulator {
 			
 			//Copy particle data to output buffer
 			match(particle_bins[rollid][i])([this, &cu_dev, &i, &d_particle_count](const auto& particle_buffer) {
-				cu_dev.compute_launch({partition_block_counts, 128}, retrieve_particle_buffer, partitions[rollid], partitions[rollid ^ 1], particle_buffer, get<typename std::decay_t<decltype(particle_buffer)>>(particle_bins[rollid ^ 1][i]), particles[i], d_particle_count);
+				cu_dev.compute_launch({partition_block_count, 128}, retrieve_particle_buffer, partitions[rollid], partitions[rollid ^ 1], particle_buffer, get<typename std::decay_t<decltype(particle_buffer)>>(particle_bins[rollid ^ 1][i]), particles[i], d_particle_count);
 			});
 			
 			//Retrieve particle count
@@ -616,9 +634,10 @@ struct GmpmSimulator {
 	//NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic, readability-magic-numbers)Current c++ version does not yet support std::span
 	void initial_setup() {
 		{
+			//TODO: Verify bounds when model offset is too large
+			
 			auto& cu_dev = Cuda::ref_cuda_context(gpuid);
 			CudaTimer timer {cu_dev.stream_compute()};
-
 			
 			timer.tick();
 			
@@ -628,9 +647,8 @@ struct GmpmSimulator {
 			}
 
 			//Store count of activated blocks
-			check_cuda_errors(cudaMemcpyAsync(&partition_block_counts, partitions[rollid ^ 1].count, sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
+			check_cuda_errors(cudaMemcpyAsync(&partition_block_count, partitions[rollid ^ 1].count, sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
 			timer.tock(fmt::format("GPU[{}] step {} init_table", gpuid, cur_step));
-
 			
 			timer.tick();
 			cu_dev.reset_mem();
@@ -642,15 +660,22 @@ struct GmpmSimulator {
 				});
 			}
 			cu_dev.syncStream<streamIdx::COMPUTE>();
+			
+			//Check size
+			if(partition_block_count > config::G_MAX_ACTIVE_BLOCK){
+				std::cerr << "Too much active blocks: " << partition_block_count << std::endl;
+				std::abort();
+			}
 
 			//Copy cell buckets from partition to particle buffer
 			for(int i = 0; i < get_model_count(); ++i) {
+				std::cout << i << " ";
 				match(particle_bins[rollid][i])([this, &cu_dev](auto& particle_buffer) {
 					//First init sizes with 0
-					check_cuda_errors(cudaMemsetAsync(particle_buffer.particle_bucket_sizes, 0, sizeof(int) * (partition_block_counts + 1), cu_dev.stream_compute()));
+					check_cuda_errors(cudaMemsetAsync(particle_buffer.particle_bucket_sizes, 0, sizeof(int) * (partition_block_count + 1), cu_dev.stream_compute()));
 					
-					cu_dev.compute_launch({partition_block_counts, config::G_BLOCKVOLUME}, cell_bucket_to_block, particle_buffer.cell_particle_counts, particle_buffer.cellbuckets, particle_buffer.particle_bucket_sizes, particle_buffer.blockbuckets);
-					// partitions[rollid ^ 1].buildParticleBuckets(cu_dev, partition_block_counts);
+					cu_dev.compute_launch({partition_block_count, config::G_BLOCKVOLUME}, cell_bucket_to_block, particle_buffer.cell_particle_counts, particle_buffer.cellbuckets, particle_buffer.particle_bucket_sizes, particle_buffer.blockbuckets);
+					// partitions[rollid ^ 1].buildParticleBuckets(cu_dev, partition_block_count);
 				});
 			}
 			
@@ -659,39 +684,51 @@ struct GmpmSimulator {
 			int* bin_sizes = tmps.bin_sizes;
 			for(int i = 0; i < get_model_count(); ++i) {
 				match(particle_bins[rollid][i])([this, &cu_dev, &bin_sizes, &i](auto& particle_buffer) {
-					cu_dev.compute_launch({(partition_block_counts + 1 + 127) / 128, 128}, compute_bin_capacity, partition_block_counts + 1, static_cast<const int*>(particle_buffer.particle_bucket_sizes), bin_sizes);
+					cu_dev.compute_launch({(partition_block_count + 1 + 127) / 128, 128}, compute_bin_capacity, partition_block_count + 1, static_cast<const int*>(particle_buffer.particle_bucket_sizes), bin_sizes);
 					
 					//Stores aggregated bin sizes in particle_buffer 
-					exclusive_scan(partition_block_counts + 1, bin_sizes, particle_buffer.bin_offsets, cu_dev);
+					exclusive_scan(partition_block_count + 1, bin_sizes, particle_buffer.bin_offsets, cu_dev);
 					
 					//Stores last aggregated size == whole size in bincount
-					check_cuda_errors(cudaMemcpyAsync(&bincount[i], particle_buffer.bin_offsets + partition_block_counts, sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
+					check_cuda_errors(cudaMemcpyAsync(&bincount[i], particle_buffer.bin_offsets + partition_block_count, sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
 					cu_dev.syncStream<streamIdx::COMPUTE>();
 					
 					//Initialize particle buffer
-					cu_dev.compute_launch({partition_block_counts, 128}, array_to_buffer, particles[i], particle_buffer);
+					cu_dev.compute_launch({partition_block_count, 128}, array_to_buffer, particles[i], particle_buffer);
 				});
 			}
 			
 			
 			//Activate blocks near active blocks
-			cu_dev.compute_launch({(partition_block_counts + 127) / 128, 128}, register_neighbor_blocks, static_cast<uint32_t>(partition_block_counts), partitions[rollid ^ 1]);
+			cu_dev.compute_launch({(partition_block_count + 127) / 128, 128}, register_neighbor_blocks, static_cast<uint32_t>(partition_block_count), partitions[rollid ^ 1]);
 			
 			//Retrieve total count
 			check_cuda_errors(cudaMemcpyAsync(&neighbor_block_count, partitions[rollid ^ 1].count, sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
 			cu_dev.syncStream<streamIdx::COMPUTE>();
 			
+			//Check size
+			if(neighbor_block_count > config::G_MAX_ACTIVE_BLOCK){
+				std::cerr << "Too much neighbour blocks: " << partition_block_count << std::endl;
+				std::abort();
+			}
+			
 			//Activate blocks near active blocks, including those before that block
 			//TODO: Only these with offset -1 are not already activated as neighbours
-			cu_dev.compute_launch({(partition_block_counts + 127) / 128, 128}, register_exterior_blocks, static_cast<uint32_t>(partition_block_counts), partitions[rollid ^ 1]);
+			cu_dev.compute_launch({(partition_block_count + 127) / 128, 128}, register_exterior_blocks, static_cast<uint32_t>(partition_block_count), partitions[rollid ^ 1]);
 			
 			//Retrieve total count
 			check_cuda_errors(cudaMemcpyAsync(&exterior_block_count, partitions[rollid ^ 1].count, sizeof(int), cudaMemcpyDefault, cu_dev.stream_compute()));
 			cu_dev.syncStream<streamIdx::COMPUTE>();
 			
+			//Check size
+			if(exterior_block_count > config::G_MAX_ACTIVE_BLOCK){
+				std::cerr << "Too much exterior blocks: " << partition_block_count << std::endl;
+				std::abort();
+			}
+			
 			timer.tock(fmt::format("GPU[{}] step {} init_partition", gpuid, cur_step));
 
-			fmt::print(fmt::emphasis::bold | fg(fmt::color::yellow), "block count on device {}: {}, {}, {} [{}]\n", gpuid, partition_block_counts, neighbor_block_count, exterior_block_count, cur_num_active_blocks);
+			fmt::print(fmt::emphasis::bold | fg(fmt::color::yellow), "block count on device {}: {}, {}, {} [{}]\n", gpuid, partition_block_count, neighbor_block_count, exterior_block_count, cur_num_active_blocks);
 			for(int i = 0; i < get_model_count(); ++i) {
 				fmt::print(fmt::emphasis::bold | fg(fmt::color::yellow), "bin count on device {}: model {}: {} [{}]\n", gpuid, i, bincount[i], cur_num_active_bins[i]);
 			}
@@ -709,7 +746,7 @@ struct GmpmSimulator {
 			for(int i = 0; i < get_model_count(); ++i) {
 				match(particle_bins[rollid][i])([this, &cu_dev, &i](const auto& particle_buffer) {
 					// bin_offsets, particle_bucket_sizes
-					particle_buffer.copy_to(get<typename std::decay_t<decltype(particle_buffer)>>(particle_bins[rollid ^ 1][i]), partition_block_counts, cu_dev.stream_compute());
+					particle_buffer.copy_to(get<typename std::decay_t<decltype(particle_buffer)>>(particle_bins[rollid ^ 1][i]), partition_block_count, cu_dev.stream_compute());
 				});
 			}
 			cu_dev.syncStream<streamIdx::COMPUTE>();
@@ -722,11 +759,11 @@ struct GmpmSimulator {
 			//Initialize the grid and advection buckets
 			for(int i = 0; i < get_model_count(); ++i) {
 				//Initialize mass and momentum
-				cu_dev.compute_launch({(particle_counts[i] + 255) / 256, 256}, rasterize, particle_counts[i], particles[i], grid_blocks[0], partitions[rollid], dt, get_mass(i), vel0[i]);
+				cu_dev.compute_launch({(particle_counts[i] + 255) / 256, 256}, rasterize, particle_counts[i], particles[i], grid_blocks[0], partitions[rollid], dt, get_mass(i), vel0[i].data_arr());
 				
-				//Init with offset 0
+				//Init advection source at offset 0 of destination
 				match(particle_bins[rollid ^ 1][i])([this, &cu_dev](auto& particle_buffer) {
-					cu_dev.compute_launch({partition_block_counts, 128}, init_adv_bucket, static_cast<const int*>(particle_buffer.particle_bucket_sizes), particle_buffer.blockbuckets);
+					cu_dev.compute_launch({partition_block_count, 128}, init_adv_bucket, static_cast<const int*>(particle_buffer.particle_bucket_sizes), particle_buffer.blockbuckets);
 				});
 			}
 			cu_dev.syncStream<streamIdx::COMPUTE>();
