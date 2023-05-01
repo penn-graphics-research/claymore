@@ -313,7 +313,7 @@ struct GmpmSimulator {
 				}
 			}
 
-			dt = compute_dt(max_vel, dt_default);
+			dt = compute_dt(max_vel, Duration::zero(), seconds_per_frame, dt_default);
 		}
 		
 		fmt::print(fmt::emphasis::bold, "{} --{}--> {}, defaultDt: {}\n", cur_time.count(), dt.count(), seconds_per_frame.count(), dt_default.count());
@@ -359,7 +359,7 @@ struct GmpmSimulator {
 				}
 			
 				max_vel = std::sqrt(max_vel);// this is a bug, should insert this line
-				next_dt = compute_dt(max_vel, dt_default);
+				next_dt = compute_dt(max_vel, current_step_time, seconds_per_frame, dt_default);
 				fmt::print(fmt::emphasis::bold, "{} --{}--> {}, defaultDt: {}, max_vel: {}\n", cur_time.count(), next_dt.count(), next_time.count(), dt_default.count(), max_vel);
 
 				/// g2p2g
