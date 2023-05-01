@@ -89,7 +89,7 @@ void parse_scene(const std::string& fn, std::unique_ptr<mn::GmpmSimulator>& benc
 				auto& sim = it->value;
 				if(sim.IsObject()) {
 					fmt::print(fg(fmt::color::cyan), "simulation: gpuid[{}], defaultDt[{}], fps[{}], frames[{}]\n", sim["gpuid"].GetInt(), sim["default_dt"].GetFloat(), sim["fps"].GetInt(), sim["frames"].GetInt());
-					benchmark = std::make_unique<mn::GmpmSimulator>(sim["gpuid"].GetInt(), sim["default_dt"].GetFloat(), sim["fps"].GetInt(), sim["frames"].GetInt());
+					benchmark = std::make_unique<mn::GmpmSimulator>(sim["gpuid"].GetInt(), mn::Duration(sim["default_dt"].GetFloat()), sim["fps"].GetInt(), sim["frames"].GetInt());
 				}
 			}
 		}///< end simulation parsing
@@ -150,11 +150,7 @@ void parse_scene(const std::string& fn, std::unique_ptr<mn::GmpmSimulator>& benc
 							velocity[d] = model["velocity"].GetArray()[d].GetFloat();
 						}
 						if(p.extension() == ".sdf") {
-							if(!check_member(model, "ppc")) {
-								return;
-							}
-
-							auto positions = mn::read_sdf(model["file"].GetString(), model["ppc"].GetFloat(), mn::config::G_DX, mn::config::G_DOMAIN_SIZE, offset, span);
+							auto positions = mn::read_sdf(model["file"].GetString(), mn::config::MODEL_PPC, mn::config::G_DX, mn::config::G_DOMAIN_SIZE, offset, span);
 							mn::IO::insert_job([&]() {
 								mn::write_partio<float, mn::config::NUM_DIMENSIONS>(p.stem().string() + ".bgeo", positions);
 							});

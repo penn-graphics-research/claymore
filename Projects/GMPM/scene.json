@@ -1,7 +1,6 @@
 {
 	"simulation": {
 		"gpuid": 0,
-		"gravity": 9.81,
 		"fps": 1200,
 		"frames": 120,
 		"default_dt": 5e-6
@@ -11,7 +10,6 @@
 			"type": "particle",
 			"file": "two_dragons.sdf",
 			"constitutive": "jfluid",
-			"ppc": 8,
 			"volume": 7.4505806e-9,
 			"rho": 1e3,
 			"bulk_modulus": 4e4,
@@ -37,7 +35,6 @@
 			"type": "particle",
 			"file": "two_dragons.sdf",
 			"constitutive": "fixed_corotated",
-			"ppc": 8,
 			"volume": 7.4505806e-9,
 			"rho": 1e3,
 			"youngs_modulus": 1e7,
@@ -62,7 +59,6 @@
 			"type": "particle",
 			"file": "two_dragons.sdf",
 			"constitutive": "sand",
-			"ppc": 8,
 			"offset": [
 				0.2,
 				0.1,

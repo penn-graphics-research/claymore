@@ -147,8 +147,8 @@ struct ParticleBuffer<MaterialE::J_FLUID> : ParticleBufferImpl<MaterialE::J_FLUI
 	float volume = (1.0f / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / config::MODEL_PPC);
 	float mass	 = (config::DENSITY / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / config::MODEL_PPC);
 	float bulk	 = 4e4;
-	float gamma	 = 7.15f;
-	float visco	 = 0.01f;
+	float gamma	 = 7.15f;//Penalize large deviations from incompressibility
+	float viscosity	 = 0.01f;
 
 	void update_parameters(float density, float vol, float b, float g, float v) {
 		rho	   = density;
@@ -156,7 +156,7 @@ struct ParticleBuffer<MaterialE::J_FLUID> : ParticleBufferImpl<MaterialE::J_FLUI
 		mass   = volume * density;
 		bulk   = b;
 		gamma  = g;
-		visco  = v;
+		viscosity  = v;
 	}
 	//NOLINTEND(readability-magic-numbers)
 
@@ -268,17 +268,9 @@ using particle_buffer_t = variant<ParticleBuffer<MaterialE::J_FLUID>, ParticleBu
 struct ParticleArray : Instance<particle_array_> {
 	using base_t = Instance<particle_array_>;
 
-	//FIXME: Should not be required, should be defined in base class
-	/*
-	ParticleArray& operator=(base_t&& instance) {
-		static_cast<base_t&>(*this) = std::move(instance);
-		return *this;
-	}
-	
-	explicit ParticleArray(base_t&& instance) {
-		static_cast<base_t&>(*this) = std::move(instance);
-	}
-	*/
+	ParticleArray() = default;
+	explicit ParticleArray(base_t&& instance)//NOLINT(cppcoreguidelines-rvalue-reference-param-not-moved) Clang say, that std::move has no effect here
+		: base_t(instance) {}
 };
 
 }// namespace mn

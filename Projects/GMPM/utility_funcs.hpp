@@ -33,23 +33,14 @@ constexpr void dir_components(int dir, ivec3& d) {
 //NOLINTEND(readability-magic-numbers) Magic numbers are formula-specific
 
 //NOLINTBEGIN(readability-magic-numbers) Magic numbers are formula-specific
-constexpr float compute_dt(float max_vel, const float cur, const float next, const float dt_default) noexcept {
-	
-	//If our next time is smaller than our current time we don't step
-	if(next < cur) {
-		return 0.0f;
-	}
-
+constexpr Duration compute_dt(float max_vel, const Duration dt_default) noexcept {
 	//Choose dt such that particles with maximum velocity cannot move more than G_DX * CFL
 	//This ensures CFL condition is satisfied
-	float dt = dt_default;
+	Duration dt = dt_default;
 	if(max_vel > 0.0f) {
-		const float new_dt = config::G_DX * config::CFL / max_vel;
+		const Duration new_dt(config::G_DX * config::CFL / max_vel);
 		dt = std::min(new_dt, dt);
 	}
-	
-	//If next time is smaller than time using dt, set dt to difference between current and next
-	dt = std::min(next - cur, dt);
 
 	return dt;
 }

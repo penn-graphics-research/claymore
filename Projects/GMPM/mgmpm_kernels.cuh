@@ -152,7 +152,7 @@ __global__ void register_exterior_blocks(uint32_t block_count, Partition partiti
 }
 
 template<typename Grid, typename Partition>
-__global__ void rasterize(uint32_t particle_counts, const ParticleArray particle_array, Grid grid, const Partition partition, float dt, float mass, std::array<float, 3> v0) {
+__global__ void rasterize(uint32_t particle_counts, const ParticleArray particle_array, Grid grid, const Partition partition, Duration dt, float mass, std::array<float, 3> v0) {
 	const uint32_t particle_id = blockIdx.x * blockDim.x + threadIdx.x;
 	if(particle_id >= particle_counts) {
 		return;
@@ -167,7 +167,7 @@ __global__ void rasterize(uint32_t particle_counts, const ParticleArray particle
 	//contrib.set(0.f);
 	//c.set(0.f);
 	
-	//contrib = (c * mass - contrib * dt) * config::G_D_INV;
+	//contrib = (c * mass - contrib * dt.count()) * config::G_D_INV;
 	
 	//Calculate grid index
 	const ivec3 global_base_index = get_block_id(global_pos) - 1;
@@ -323,7 +323,7 @@ __global__ void array_to_buffer(ParticleArray particle_array, ParticleBuffer<Mat
 }
 
 template<typename Grid, typename Partition>
-__global__ void update_grid_velocity_query_max(uint32_t block_count, Grid grid, Partition partition, float dt, float* max_vel) {
+__global__ void update_grid_velocity_query_max(uint32_t block_count, Grid grid, Partition partition, Duration dt, float* max_vel) {
 	const int boundary_condition				   = static_cast<int>(std::floor(config::G_BOUNDARY_CONDITION));
 	constexpr int NUM_WARPS		   = config::G_NUM_GRID_BLOCKS_PER_CUDA_BLOCK * config::G_NUM_WARPS_PER_GRID_BLOCK;
 	constexpr unsigned ACTIVE_MASK = 0xffffffff;
@@ -332,7 +332,7 @@ __global__ void update_grid_velocity_query_max(uint32_t block_count, Grid grid, 
 	__shared__ float sh_maxvels[shared_memory_element_count];//NOLINT(modernize-avoid-c-arrays) Cannot declare runtime size shared memory as std::array
 	
 	//Fetch block number and id
-	const int blockno		= static_cast<int>(blockIdx.x) * config::G_NUM_GRID_BLOCKS_PER_CUDA_BLOCK + static_cast<int>(threadIdx.x) / 32 / config::G_NUM_WARPS_PER_GRID_BLOCK;
+	const int blockno		= static_cast<int>(blockIdx.x) * config::G_NUM_GRID_BLOCKS_PER_CUDA_BLOCK + static_cast<int>(threadIdx.x) / config::CUDA_WARP_SIZE / config::G_NUM_WARPS_PER_GRID_BLOCK;
 	const auto blockid	= partition.active_keys[blockno];
 	
 	//Check if the block is outside of grid bounds
@@ -347,7 +347,7 @@ __global__ void update_grid_velocity_query_max(uint32_t block_count, Grid grid, 
 	/// within-warp computations
 	if(blockno < block_count) {
 		auto grid_block = grid.ch(_0, blockno);
-		for(int cell_id_in_block = static_cast<int>(threadIdx.x % 32); cell_id_in_block < config::G_BLOCKVOLUME; cell_id_in_block += 32) {
+		for(int cell_id_in_block = static_cast<int>(threadIdx.x % config::CUDA_WARP_SIZE); cell_id_in_block < config::G_BLOCKVOLUME; cell_id_in_block += config::CUDA_WARP_SIZE) {
 			const float mass	  = grid_block.val_1d(_0, cell_id_in_block);
 			float vel_sqr = 0.0f;
 			vec3 vel;
@@ -366,7 +366,7 @@ __global__ void update_grid_velocity_query_max(uint32_t block_count, Grid grid, 
 				//Update velocity. Set to 0 if outside of bounds
 				vel[0] = is_in_bound & 4 ? 0.0f : vel[0] * mass_inv;
 				vel[1] = is_in_bound & 2 ? 0.0f : vel[1] * mass_inv;
-				vel[1] += config::G_GRAVITY * dt;
+				vel[1] += config::G_GRAVITY * dt.count();
 				vel[2] = is_in_bound & 1 ? 0.0f : vel[2] * mass_inv;
 				// if (is_in_bound) ///< sticky
 				//  vel.set(0.f);
@@ -390,15 +390,15 @@ __global__ void update_grid_velocity_query_max(uint32_t block_count, Grid grid, 
 			// unsigned activeMask = __ballot_sync(0xffffffff, mv[0] != 0.0f);
 			
 			//Calculate max velocity in warp
-			for(int iter = 1; iter % 32; iter <<= 1) {
-				float tmp = __shfl_down_sync(ACTIVE_MASK, vel_sqr, iter, 32);
-				if((threadIdx.x % 32) + iter < 32) {
+			for(int iter = 1; iter % config::CUDA_WARP_SIZE; iter <<= 1) {
+				float tmp = __shfl_down_sync(ACTIVE_MASK, vel_sqr, iter, config::CUDA_WARP_SIZE);
+				if((threadIdx.x % config::CUDA_WARP_SIZE) + iter < config::CUDA_WARP_SIZE) {
 					vel_sqr = tmp > vel_sqr ? tmp : vel_sqr;
 				}
 			}
-			//TODO: Ensure threadIdx.x / 32 is smalöer than NUM_WARPS
-			if(vel_sqr > sh_maxvels[threadIdx.x / 32] && (threadIdx.x % 32) == 0) {
-				sh_maxvels[threadIdx.x / 32] = vel_sqr;
+			//TODO: Ensure threadIdx.x / config::CUDA_WARP_SIZE is smaller than NUM_WARPS
+			if(vel_sqr > sh_maxvels[threadIdx.x / config::CUDA_WARP_SIZE] && (threadIdx.x % config::CUDA_WARP_SIZE) == 0) {
+				sh_maxvels[threadIdx.x / config::CUDA_WARP_SIZE] = vel_sqr;
 			}
 		}
 	}
@@ -468,14 +468,13 @@ struct CalculateContributionAndStoreParticleDataIntermediate{
 };
 
 template<MaterialE MaterialType>
-__forceinline__ __device__ void calculate_contribution_and_store_particle_data(const ParticleBuffer<MaterialType> particle_buffer, const ParticleBuffer<MaterialType> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, float dt, float new_dt, const vec9& C, vec9& contrib, CalculateContributionAndStoreParticleDataIntermediate& data);
+__forceinline__ __device__ void calculate_contribution_and_store_particle_data(const ParticleBuffer<MaterialType> particle_buffer, const ParticleBuffer<MaterialType> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, Duration dt, const vec9& A, vec9& contrib, CalculateContributionAndStoreParticleDataIntermediate& data);
 
 template<>
-__forceinline__ __device__ void calculate_contribution_and_store_particle_data<MaterialE::J_FLUID>(const ParticleBuffer<MaterialE::J_FLUID> particle_buffer, const ParticleBuffer<MaterialE::J_FLUID> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, float dt, float new_dt, const vec9& C, vec9& contrib, CalculateContributionAndStoreParticleDataIntermediate& data){
-	//TODO: Find formula that explains this
-	//Update determinante of deformation gradiant?
-	//Divergence? multiplied with time and transfered to global space
-	data.J += (C[0] + C[4] + C[8]) * dt * config::G_D_INV * data.J;
+__forceinline__ __device__ void calculate_contribution_and_store_particle_data<MaterialE::J_FLUID>(const ParticleBuffer<MaterialE::J_FLUID> particle_buffer, const ParticleBuffer<MaterialE::J_FLUID> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, Duration dt, const vec9& A, vec9& contrib, CalculateContributionAndStoreParticleDataIntermediate& data){
+	//Update determinante of deformation gradiant
+	//Divergence of velocity multiplied with time and transfered to global space
+	data.J += (A[0] + A[4] + A[8]) * dt.count() * config::G_D_INV * data.J;
 	
 	//Too low is bad. clamp to 0.1
 	//TODO: Maybe make this 0.1 a parameter
@@ -485,20 +484,22 @@ __forceinline__ __device__ void calculate_contribution_and_store_particle_data<M
 	
 	//TODO: What is calculated here?
 	{
+		
 		float voln	   = data.J * particle_buffer.volume;
 		float pressure = particle_buffer.bulk * (powf(data.J, -particle_buffer.gamma) - 1.f);
+		//? - stress; stress = pressure * identity;
 		{
-			contrib[0] = ((C[0] + C[0]) * config::G_D_INV * particle_buffer.visco - pressure) * voln;
-			contrib[1] = (C[1] + C[3]) * config::G_D_INV * particle_buffer.visco * voln;
-			contrib[2] = (C[2] + C[6]) * config::G_D_INV * particle_buffer.visco * voln;
+			contrib[0] = ((A[0] + A[0]) * config::G_D_INV * particle_buffer.viscosity - pressure) * voln;
+			contrib[1] = (A[1] + A[3]) * config::G_D_INV * particle_buffer.viscosity * voln;
+			contrib[2] = (A[2] + A[6]) * config::G_D_INV * particle_buffer.viscosity * voln;
 
-			contrib[3] = (C[3] + C[1]) * config::G_D_INV * particle_buffer.visco * voln;
-			contrib[4] = ((C[4] + C[4]) * config::G_D_INV * particle_buffer.visco - pressure) * voln;
-			contrib[5] = (C[5] + C[7]) * config::G_D_INV * particle_buffer.visco * voln;
+			contrib[3] = (A[3] + A[1]) * config::G_D_INV * particle_buffer.viscosity * voln;
+			contrib[4] = ((A[4] + A[4]) * config::G_D_INV * particle_buffer.viscosity - pressure) * voln;
+			contrib[5] = (A[5] + A[7]) * config::G_D_INV * particle_buffer.viscosity * voln;
 
-			contrib[6] = (C[6] + C[2]) * config::G_D_INV * particle_buffer.visco * voln;
-			contrib[7] = (C[7] + C[5]) * config::G_D_INV * particle_buffer.visco * voln;
-			contrib[8] = ((C[8] + C[8]) * config::G_D_INV * particle_buffer.visco - pressure) * voln;
+			contrib[6] = (A[6] + A[2]) * config::G_D_INV * particle_buffer.viscosity * voln;
+			contrib[7] = (A[7] + A[5]) * config::G_D_INV * particle_buffer.viscosity * voln;
+			contrib[8] = ((A[8] + A[8]) * config::G_D_INV * particle_buffer.viscosity - pressure) * voln;
 		}
 	}
 	
@@ -513,11 +514,11 @@ __forceinline__ __device__ void calculate_contribution_and_store_particle_data<M
 }
 
 template<>
-__forceinline__ __device__ void calculate_contribution_and_store_particle_data<MaterialE::FIXED_COROTATED>(const ParticleBuffer<MaterialE::FIXED_COROTATED> particle_buffer, const ParticleBuffer<MaterialE::FIXED_COROTATED> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, float dt, float new_dt, const vec9& C, vec9& contrib, CalculateContributionAndStoreParticleDataIntermediate& data){
+__forceinline__ __device__ void calculate_contribution_and_store_particle_data<MaterialE::FIXED_COROTATED>(const ParticleBuffer<MaterialE::FIXED_COROTATED> particle_buffer, const ParticleBuffer<MaterialE::FIXED_COROTATED> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, Duration dt, const vec9& A, vec9& contrib, CalculateContributionAndStoreParticleDataIntermediate& data){
 	vec3x3 dws;
 	#pragma unroll 9
 	for(int d = 0; d < 9; ++d) {
-		dws.val(d) = C[d] * dt * config::G_D_INV + ((d & 0x3) ? 0.f : 1.f);
+		dws.val(d) = A[d] * dt.count() * config::G_D_INV + ((d & 0x3) ? 0.f : 1.f);
 	}
 
 	{
@@ -554,11 +555,11 @@ __forceinline__ __device__ void calculate_contribution_and_store_particle_data<M
 }
 
 template<>
-__forceinline__ __device__ void calculate_contribution_and_store_particle_data<MaterialE::SAND>(const ParticleBuffer<MaterialE::SAND> particle_buffer, const ParticleBuffer<MaterialE::SAND> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, float dt, float new_dt, const vec9& C, vec9& contrib, CalculateContributionAndStoreParticleDataIntermediate& data){
+__forceinline__ __device__ void calculate_contribution_and_store_particle_data<MaterialE::SAND>(const ParticleBuffer<MaterialE::SAND> particle_buffer, const ParticleBuffer<MaterialE::SAND> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, Duration dt, const vec9& A, vec9& contrib, CalculateContributionAndStoreParticleDataIntermediate& data){
 	vec3x3 dws;
 	#pragma unroll 9
 	for(int d = 0; d < 9; ++d) {
-		dws.val(d) = C[d] * dt * config::G_D_INV + ((d & 0x3) ? 0.f : 1.f);
+		dws.val(d) = A[d] * dt.count() * config::G_D_INV + ((d & 0x3) ? 0.f : 1.f);
 	}
 
 	{
@@ -601,17 +602,15 @@ __forceinline__ __device__ void calculate_contribution_and_store_particle_data<M
 			particle_bin.val(_11, particle_id_in_block % config::G_BIN_CAPACITY) = F[8];
 			particle_bin.val(_12, particle_id_in_block % config::G_BIN_CAPACITY) = log_jp;
 		}
-		
-		vec9 contrib_tmp = (C * particle_buffer.mass - contrib * new_dt) * config::G_D_INV;
 	}
 }
 
 template<>
-__forceinline__ __device__ void calculate_contribution_and_store_particle_data<MaterialE::NACC>(const ParticleBuffer<MaterialE::NACC> particle_buffer, const ParticleBuffer<MaterialE::NACC> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, float dt, float new_dt, const vec9& C, vec9& contrib, CalculateContributionAndStoreParticleDataIntermediate& data){
+__forceinline__ __device__ void calculate_contribution_and_store_particle_data<MaterialE::NACC>(const ParticleBuffer<MaterialE::NACC> particle_buffer, const ParticleBuffer<MaterialE::NACC> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, Duration dt, const vec9& A, vec9& contrib, CalculateContributionAndStoreParticleDataIntermediate& data){
 	vec3x3 dws;
 	#pragma unroll 9
 	for(int d = 0; d < 9; ++d) {
-		dws.val(d) = C[d] * dt * config::G_D_INV + ((d & 0x3) ? 0.f : 1.f);
+		dws.val(d) = A[d] * dt.count() * config::G_D_INV + ((d & 0x3) ? 0.f : 1.f);
 	}
 
 	{
@@ -659,7 +658,7 @@ __forceinline__ __device__ void calculate_contribution_and_store_particle_data<M
 }
 
 template<typename Partition, typename Grid, MaterialE MaterialType>
-__global__ void g2p2g(float dt, float new_dt, const ParticleBuffer<MaterialType> particle_buffer, ParticleBuffer<MaterialType> next_particle_buffer, const Partition prev_partition, Partition partition, const Grid grid, Grid next_grid) {
+__global__ void g2p2g(Duration dt, Duration new_dt, const ParticleBuffer<MaterialType> particle_buffer, ParticleBuffer<MaterialType> next_particle_buffer, const Partition prev_partition, Partition partition, const Grid grid, Grid next_grid) {
 	static constexpr uint64_t NUM_VI_PER_BLOCK = static_cast<uint64_t>(config::G_BLOCKVOLUME) * 3;
 	static constexpr uint64_t NUM_VI_IN_ARENA  = NUM_VI_PER_BLOCK << 3;
 
@@ -780,16 +779,14 @@ __global__ void g2p2g(float dt, float new_dt, const ParticleBuffer<MaterialType>
 		//Save global_base_index
 		ivec3 base_index			   = global_base_index;
 
-		//Calculate weights? and mask global index
+		//Calculate weights and mask global index
 		vec3x3 dws;
 #pragma unroll 3
 		for(int dd = 0; dd < 3; ++dd) {
-			float d	   = (local_pos[dd] - (std::round(local_pos[dd] * config::G_DX_INV) - 1.0f) * config::G_DX) * config::G_DX_INV;
-			dws(dd, 0) = 0.5f * (1.5f - d) * (1.5f - d);
-			d -= 1.0f;
-			dws(dd, 1)			 = 0.75f - d * d;
-			d					 = 0.5f + d;
-			dws(dd, 2)			 = 0.5f * d * d;
+			const vec3 weight = bspline_weight(local_pos[dd]);
+			dws(dd, 0) = weight[0];
+			dws(dd, 1) = weight[1];
+			dws(dd, 2) = weight[2];
 			
 			//Calculate (modulo (config::G_BLOCKMASK + 1)) + 1 of index (== (..., -4, -3, -2, -1, 0, 1, 2, 3, 4, ...) -> (..., 4, 1, 2, 3, 4, 1, 2, 3, 4, ...))
 			global_base_index[dd] = ((base_index[dd] - 1) & config::G_BLOCKMASK) + 1;
@@ -797,11 +794,11 @@ __global__ void g2p2g(float dt, float new_dt, const ParticleBuffer<MaterialType>
 		
 		//Calculate particle velocity and APIC affine matrix
 		//v_p = sum(i, weight_i_p * v_i)
-		//C = sum(i, weight_i_p * v_i * (x_i - x_p))
+		//A = sum(i, weight_i_p * v_i * (x_i - x_p))
 		vec3 vel;
 		vel.set(0.f);
-		vec9 C;
-		C.set(0.f);
+		vec9 A;//affine state
+		A.set(0.f);
 #pragma unroll 3
 		for(char i = 0; i < 3; i++) {
 #pragma unroll 3
@@ -821,32 +818,41 @@ __global__ void g2p2g(float dt, float new_dt, const ParticleBuffer<MaterialType>
 					vel += W * vi;
 					
 					//Calculate APIC affine matrix
-					C[0] += W * vi[0] * xixp[0];
-					C[1] += W * vi[1] * xixp[0];
-					C[2] += W * vi[2] * xixp[0];
-					C[3] += W * vi[0] * xixp[1];
-					C[4] += W * vi[1] * xixp[1];
-					C[5] += W * vi[2] * xixp[1];
-					C[6] += W * vi[0] * xixp[2];
-					C[7] += W * vi[1] * xixp[2];
-					C[8] += W * vi[2] * xixp[2];
+					A[0] += W * vi[0] * xixp[0];
+					A[1] += W * vi[1] * xixp[0];
+					A[2] += W * vi[2] * xixp[0];
+					A[3] += W * vi[0] * xixp[1];
+					A[4] += W * vi[1] * xixp[1];
+					A[5] += W * vi[2] * xixp[1];
+					A[6] += W * vi[0] * xixp[2];
+					A[7] += W * vi[1] * xixp[2];
+					A[8] += W * vi[2] * xixp[2];
 				}
 			}
 		}
 		
 		//Update particle position
-		pos += vel * dt;
+		pos += vel * dt.count();
 
 		CalculateContributionAndStoreParticleDataIntermediate store_particle_buffer_tmp;
 		store_particle_buffer_tmp.pos = pos;
 		store_particle_buffer_tmp.J = J;
 
 		vec9 contrib;
-		calculate_contribution_and_store_particle_data<MaterialType>(particle_buffer, next_particle_buffer, advection_source_blockno, source_pidib, src_blockno, particle_id_in_block, dt, new_dt, C, contrib, store_particle_buffer_tmp);
-		contrib = (C * particle_buffer.mass - contrib * new_dt) * config::G_D_INV;
+		calculate_contribution_and_store_particle_data<MaterialType>(particle_buffer, next_particle_buffer, advection_source_blockno, source_pidib, src_blockno, particle_id_in_block, dt, A, contrib, store_particle_buffer_tmp);
+		
+		//Update momentum?
+		//Multiply A with mass to complete it. Then subtract current momentum?
+		//C = A * D^-1
+		contrib = (A * particle_buffer.mass - contrib * new_dt.count()) * config::G_D_INV;
 
-		//Calculate grid index after movement and store index and movement direction
+		//Calculate grid index after movement
 		ivec3 new_global_base_index = get_block_id(pos) - 1;
+		
+		//Update local position
+		local_pos = pos - new_global_base_index * config::G_DX;
+		
+		//Store index and movement direction
 		{
 			//Calculate direction offset
 			const int dirtag = dir_offset((base_index - 1) / static_cast<int>(config::G_BLOCKSIZE) - (new_global_base_index - 1) / static_cast<int>(config::G_BLOCKSIZE));
@@ -855,18 +861,16 @@ __global__ void g2p2g(float dt, float new_dt, const ParticleBuffer<MaterialType>
 			next_particle_buffer.add_advection(partition, new_global_base_index - 1, dirtag, particle_id_in_block);
 			// partition.add_advection(new_global_base_index - 1, dirtag, particle_id_in_block);
 		}
-		// dws[d] = bspline_weight(local_pos[d]);
 
-		//Calculate weights? and mask global index
+		//Calculate weights and mask global index
 #pragma unroll 3
 		for(char dd = 0; dd < 3; ++dd) {
-			local_pos[dd] = pos[dd] - static_cast<float>(new_global_base_index[dd]) * config::G_DX;
-			float d		  = (local_pos[dd] - (std::round(local_pos[dd] * config::G_DX_INV) - 1.0f) * config::G_DX) * config::G_DX_INV;
-			dws(dd, 0)	  = 0.5f * (1.5f - d) * (1.5f - d);
-			d -= 1.0f;
-			dws(dd, 1) = 0.75f - d * d;
-			d		   = 0.5f + d;
-			dws(dd, 2) = 0.5f * d * d;
+			
+			
+			const vec3 weight = bspline_weight(local_pos[dd]);
+			dws(dd, 0) = weight[0];
+			dws(dd, 1) = weight[1];
+			dws(dd, 2) = weight[2];
 
 			//Calculate (modulo (config::G_BLOCKMASK + 1)) + 1 of index (== (..., -4, -3, -2, -1, 0, 1, 2, 3, 4, ...) -> (..., 4, 1, 2, 3, 4, 1, 2, 3, 4, ...)) and add offset (may not be out of range max [-4, 4] min [-1, 1])
 			new_global_base_index[dd] = (((base_index[dd] - 1) & config::G_BLOCKMASK) + 1) + (new_global_base_index[dd] - base_index[dd]);
@@ -879,7 +883,7 @@ __global__ void g2p2g(float dt, float new_dt, const ParticleBuffer<MaterialType>
 		){
 			printf("new_global_base_index out of range: %d %d %d\n", new_global_base_index[0], new_global_base_index[1], new_global_base_index[2]);
 			return;
-		}//TODO: Also add to other g2p2g kernels
+		}
 		
 		//Calculate new gird momentum and mass
 		//m_i * v_i = sum(p, w_i_p * m_p * vel_p + ?)

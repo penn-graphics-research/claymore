@@ -79,7 +79,7 @@ struct ParticleBuffer<MaterialE::J_FLUID> : ParticleBufferImpl<MaterialE::J_FLUI
 	float mass	 = (config::DENSITY / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / config::MODEL_PPC);
 	float bulk	 = 4e4;
 	float gamma	 = 7.15f;
-	float visco	 = 0.01f;
+	float viscosity	 = 0.01f;
 
 	void update_parameters(float density, float vol, float b, float g, float v) {
 		rho	   = density;
@@ -87,7 +87,7 @@ struct ParticleBuffer<MaterialE::J_FLUID> : ParticleBufferImpl<MaterialE::J_FLUI
 		mass   = volume * density;
 		bulk   = b;
 		gamma  = g;
-		visco  = v;
+		viscosity  = v;
 	}
 	//NOLINTEND(readability-magic-numbers)
 

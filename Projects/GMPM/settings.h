@@ -16,6 +16,8 @@ using vec3x3   = vec<float, 3, 3>;
 using vec3x4   = vec<float, 3, 4>;
 using vec3x3x3 = vec<float, 3, 3, 3>;
 
+using Duration = std::chrono::duration<float>;
+
 /// sand = Drucker Prager Plasticity, StvkHencky Elasticity
 enum class MaterialE {
 	J_FLUID = 0,
@@ -36,14 +38,15 @@ namespace config {
 	}
 	constexpr int G_TOTAL_FRAME_CNT = 60;
 	constexpr int NUM_DIMENSIONS	= 3;
+	
+	constexpr int CUDA_WARP_SIZE		   = 32;
 
 	constexpr int GBPCB							   = 16;
 	constexpr int G_NUM_GRID_BLOCKS_PER_CUDA_BLOCK = GBPCB;
 	constexpr int G_NUM_WARPS_PER_GRID_BLOCK	   = 1;
-	constexpr int G_NUM_WARPS_PER_CUDA_BLOCK	   = GBPCB;
+	constexpr int G_NUM_WARPS_PER_CUDA_BLOCK	   = GBPCB;//>= G_NUM_GRID_BLOCKS_PER_CUDA_BLOCK
 	constexpr int G_PARTICLE_BATCH_CAPACITY		   = 128;
 
-	//FIXME: Ensure that this is the same as that of model file. Or directly use that one
 	constexpr float MODEL_PPC	= 8.0f;
 	constexpr float G_MODEL_PPC = MODEL_PPC;
 	constexpr float CFL			= 0.5f;
@@ -78,7 +81,6 @@ namespace config {
 	constexpr float YOUNGS_MODULUS = 5e3;
 	constexpr float POISSON_RATIO  = 0.4f;
 
-	//FIXME: Ensure that this is the same as that of model file. Or directly use that one
 	constexpr float G_GRAVITY = -9.8f;
 
 	/// only used on host

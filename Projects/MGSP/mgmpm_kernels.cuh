@@ -550,17 +550,17 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 			float voln	   = J * particle_buffer.volume;
 			float pressure = particle_buffer.bulk * (powf(J, -particle_buffer.gamma) - 1.f);
 			{
-				contrib[0] = ((C[0] + C[0]) * config::G_D_INV * particle_buffer.visco - pressure) * voln;
-				contrib[1] = (C[1] + C[3]) * config::G_D_INV * particle_buffer.visco * voln;
-				contrib[2] = (C[2] + C[6]) * config::G_D_INV * particle_buffer.visco * voln;
+				contrib[0] = ((C[0] + C[0]) * config::G_D_INV * particle_buffer.viscosity - pressure) * voln;
+				contrib[1] = (C[1] + C[3]) * config::G_D_INV * particle_buffer.viscosity * voln;
+				contrib[2] = (C[2] + C[6]) * config::G_D_INV * particle_buffer.viscosity * voln;
 
-				contrib[3] = (C[3] + C[1]) * config::G_D_INV * particle_buffer.visco * voln;
-				contrib[4] = ((C[4] + C[4]) * config::G_D_INV * particle_buffer.visco - pressure) * voln;
-				contrib[5] = (C[5] + C[7]) * config::G_D_INV * particle_buffer.visco * voln;
+				contrib[3] = (C[3] + C[1]) * config::G_D_INV * particle_buffer.viscosity * voln;
+				contrib[4] = ((C[4] + C[4]) * config::G_D_INV * particle_buffer.viscosity - pressure) * voln;
+				contrib[5] = (C[5] + C[7]) * config::G_D_INV * particle_buffer.viscosity * voln;
 
-				contrib[6] = (C[6] + C[2]) * config::G_D_INV * particle_buffer.visco * voln;
-				contrib[7] = (C[7] + C[5]) * config::G_D_INV * particle_buffer.visco * voln;
-				contrib[8] = ((C[8] + C[8]) * config::G_D_INV * particle_buffer.visco - pressure) * voln;
+				contrib[6] = (C[6] + C[2]) * config::G_D_INV * particle_buffer.viscosity * voln;
+				contrib[7] = (C[7] + C[5]) * config::G_D_INV * particle_buffer.viscosity * voln;
+				contrib[8] = ((C[8] + C[8]) * config::G_D_INV * particle_buffer.viscosity - pressure) * voln;
 			}
 			contrib = (C * particle_buffer.mass - contrib * new_dt) * config::G_D_INV;
 			{
