@@ -114,6 +114,7 @@ struct Partition
 		halo_base_t::copy_to(other, block_count, stream);
 		check_cuda_errors(cudaMemcpyAsync(other.index_table, this->index_table, sizeof(value_t) * domain::extent, cudaMemcpyDefault, stream));
 	}
+	//FIXME: passing kjey_t here might cause problems because cuda is buggy
 	__forceinline__ __device__ value_t insert(key_t key) noexcept {
 		value_t tag = atomicCAS(&this->index(key), sentinel_v, 0);
 		if(tag == sentinel_v) {
@@ -124,6 +125,7 @@ struct Partition
 		}
 		return -1;
 	}
+	//FIXME: passing kjey_t here might cause problems because cuda is buggy
 	__forceinline__ __device__ value_t query(key_t key) const noexcept {
 		return this->index(key);
 	}

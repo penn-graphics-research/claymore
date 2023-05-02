@@ -96,6 +96,7 @@ struct ParticleBufferImpl : Instance<particle_buffer_<particle_bin_<Mt>>> {
 		check_cuda_errors(cudaMemcpyAsync(other.particle_bucket_sizes, particle_bucket_sizes, sizeof(int) * block_count, cudaMemcpyDefault, stream));
 	}
 
+	//FIXME: passing kjey_t here might cause problems because cuda is buggy
 	__forceinline__ __device__ void add_advection(Partition<1>& table, Partition<1>::key_t cellid, int dirtag, int particle_id_in_block) noexcept {
 		const Partition<1>::key_t blockid = cellid / static_cast<int>(config::G_BLOCKSIZE);
 		const int blockno					= table.query(blockid);
@@ -104,7 +105,7 @@ struct ParticleBufferImpl : Instance<particle_buffer_<particle_bin_<Mt>>> {
 		//If block does not yet exist, print message and return (particle will be lost).
 		if(blockno == -1) {
 			#if PRINT_NEGATIVE_BLOGNOS
-			ivec3 offset {};
+			std::array<int, 3> offset {};
 			dir_components(dirtag, offset);
 			//NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg, readability-magic-numbers) Cuda has no other way to print; Numbers are array indices to be printed
 			printf("loc(%d, %d, %d) dir(%d, %d, %d) particle_id_in_block(%d)\n", cellid[0], cellid[1], cellid[2], offset[0], offset[1], offset[2], particle_id_in_block);

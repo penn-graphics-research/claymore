@@ -27,12 +27,12 @@ struct ComputeStressIntermediate{
 };
 
 template<typename T = float, MaterialE MaterialType>
-__forceinline__ __device__ void compute_stress(const T volume, const T mu, const T lambda, vec<T, 9>& F, vec<T, 9>& PF, ComputeStressIntermediate<T>& data);
+__forceinline__ __device__ void compute_stress(const T volume, const T mu, const T lambda, std::array<T, 9>& F, std::array<T, 9>& PF, ComputeStressIntermediate<T>& data);
 
 //TODO: But maybe use names instead for better understanding
 //NOLINTBEGIN(readability-magic-numbers, readability-identifier-naming) Magic numbers are formula specific; Common naming for this physical formulas
 template<>
-__forceinline__ __device__ void compute_stress<float, MaterialE::FIXED_COROTATED>(const float volume, const float mu, const float lambda, vec<float, 9>& F, vec<float, 9>& PF, ComputeStressIntermediate<float>& data) {
+__forceinline__ __device__ void compute_stress<float, MaterialE::FIXED_COROTATED>(const float volume, const float mu, const float lambda, std::array<float, 9>& F, std::array<float, 9>& PF, ComputeStressIntermediate<float>& data) {
 	std::array<float, 9> U = {};
 	std::array<float, 3> S = {};
 	std::array<float, 9> V = {};
@@ -72,7 +72,7 @@ __forceinline__ __device__ void compute_stress<float, MaterialE::FIXED_COROTATED
 //TODO: But maybe use names instead for better understanding
 //NOLINTBEGIN(readability-magic-numbers, readability-identifier-naming) Magic numbers are formula specific; Common naming for this physical formulas
 template<>
-__forceinline__ __device__ void compute_stress<float, MaterialE::NACC>(const float volume, const float mu, const float lambda, vec<float, 9>& F, vec<float, 9>& PF, ComputeStressIntermediate<float>& data) {
+__forceinline__ __device__ void compute_stress<float, MaterialE::NACC>(const float volume, const float mu, const float lambda, std::array<float, 9>& F, std::array<float, 9>& PF, ComputeStressIntermediate<float>& data) {
 	(void) lambda;
 
 	std::array<float, 9> U = {};
@@ -191,7 +191,7 @@ __forceinline__ __device__ void compute_stress<float, MaterialE::NACC>(const flo
 	float J					   = S[0] * S[1] * S[2];
 	std::array<float, 9> b_dev = {};
 	std::array<float, 9> b	   = {};
-	matrix_matrix_tranpose_multiplication_3d(F.data_arr(), b);
+	matrix_matrix_tranpose_multiplication_3d(F, b);
 	matrix_deviatoric_3d(b, b_dev);
 	
 	//FIXME: Fail-safe test  for precision error caused by compiler. Not placed in matrix_deviatoric_3d cause error does not seem to be detectable in there
@@ -226,7 +226,7 @@ __forceinline__ __device__ void compute_stress<float, MaterialE::NACC>(const flo
 //TODO: But maybe use names instead for better understanding
 //NOLINTBEGIN(readability-magic-numbers, readability-identifier-naming) Magic numbers are formula specific; Common naming for this physical formulas
 template<>
-__forceinline__ __device__ void compute_stress<float, MaterialE::SAND>(const float volume, const float mu, const float lambda, vec<float, 9>& F, vec<float, 9>& PF, ComputeStressIntermediate<float>& data) {
+__forceinline__ __device__ void compute_stress<float, MaterialE::SAND>(const float volume, const float mu, const float lambda, std::array<float, 9>& F, std::array<float, 9>& PF, ComputeStressIntermediate<float>& data) {
 	std::array<float, 9> U = {};
 	std::array<float, 3> S = {};
 	std::array<float, 9> V = {};

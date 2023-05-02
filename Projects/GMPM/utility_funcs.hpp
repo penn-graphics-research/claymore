@@ -18,14 +18,14 @@ constexpr vec3 bspline_weight(float p) {
 	return dw;
 }
 
-constexpr ivec3 get_block_id(const vec3& position){
+constexpr ivec3 get_block_id(const std::array<float, 3>& position){
 	return ivec3(static_cast<int>(std::lround(position[0] * config::G_DX_INV)), static_cast<int>(std::lround(position[1] * config::G_DX_INV)), static_cast<int>(std::lround(position[2] * config::G_DX_INV)));
 }
 
-constexpr int dir_offset(ivec3 d) {
+constexpr int dir_offset(const std::array<int, 3>& d) {
 	return (d[0] + 1) * 9 + (d[1] + 1) * 3 + d[2] + 1;
 }
-constexpr void dir_components(int dir, ivec3& d) {
+constexpr void dir_components(int dir, std::array<int, 3>& d) {
 	d[2] = (dir % 3) - 1;
 	d[1] = ((dir / 3) % 3) - 1;
 	d[0] = ((dir / 9) % 3) - 1;

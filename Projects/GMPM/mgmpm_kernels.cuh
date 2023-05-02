@@ -26,7 +26,7 @@ __global__ void activate_blocks(uint32_t particle_counts, ParticleArray particle
 	}
 	
 	//Get block id by particle pos
-	const ivec3 coord = get_block_id(vec3(particle_array.val(_0, particle_id), particle_array.val(_1, particle_id), particle_array.val(_2, particle_id))) - 2;
+	const ivec3 coord = get_block_id({particle_array.val(_0, particle_id), particle_array.val(_1, particle_id), particle_array.val(_2, particle_id)}) - 2;
 	const ivec3 blockid																								 = coord / static_cast<int>(config::G_BLOCKSIZE);
 
 
@@ -42,7 +42,7 @@ __global__ void build_particle_cell_buckets(uint32_t particle_counts, ParticleAr
 	}
 	
 	//Get block id by particle pos
-	const ivec3 coord = get_block_id(vec3(particle_array.val(_0, particle_id), particle_array.val(_1, particle_id), particle_array.val(_2, particle_id))) - 2;
+	const ivec3 coord = get_block_id({particle_array.val(_0, particle_id), particle_array.val(_1, particle_id), particle_array.val(_2, particle_id)}) - 2;
 	const ivec3 blockid																								 = coord / static_cast<int>(config::G_BLOCKSIZE);
 	
 	//Fetch block number
@@ -100,7 +100,7 @@ __global__ void init_adv_bucket(const int* particle_bucket_sizes, int* buckets) 
 	
 	for(int particle_id_in_block = static_cast<int>(threadIdx.x); particle_id_in_block < particle_counts; particle_id_in_block += static_cast<int>(blockDim.x)) {
 		//Combine offset of 0 with local index in block
-		bucket[particle_id_in_block] = (dir_offset(ivec3 {0, 0, 0}) * config::G_PARTICLE_NUM_PER_BLOCK) | particle_id_in_block;
+		bucket[particle_id_in_block] = (dir_offset({0, 0, 0}) * config::G_PARTICLE_NUM_PER_BLOCK) | particle_id_in_block;
 	}
 }
 
@@ -170,7 +170,7 @@ __global__ void rasterize(uint32_t particle_counts, const ParticleArray particle
 	//contrib = (c * mass - contrib * dt.count()) * config::G_D_INV;
 	
 	//Calculate grid index
-	const ivec3 global_base_index = get_block_id(global_pos) - 1;
+	const ivec3 global_base_index = get_block_id(global_pos.data_arr()) - 1;
 	
 	//Calculate position relative to grid cell
 	const vec3 local_pos = global_pos - global_base_index * config::G_DX;
@@ -468,10 +468,10 @@ struct CalculateContributionAndStoreParticleDataIntermediate{
 };
 
 template<MaterialE MaterialType>
-__forceinline__ __device__ void calculate_contribution_and_store_particle_data(const ParticleBuffer<MaterialType> particle_buffer, const ParticleBuffer<MaterialType> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, Duration dt, const vec9& A, vec9& contrib, CalculateContributionAndStoreParticleDataIntermediate& data);
+__forceinline__ __device__ void calculate_contribution_and_store_particle_data(const ParticleBuffer<MaterialType> particle_buffer, const ParticleBuffer<MaterialType> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, Duration dt, const std::array<float, 9>& A, std::array<float, 9>& contrib, CalculateContributionAndStoreParticleDataIntermediate& data);
 
 template<>
-__forceinline__ __device__ void calculate_contribution_and_store_particle_data<MaterialE::J_FLUID>(const ParticleBuffer<MaterialE::J_FLUID> particle_buffer, const ParticleBuffer<MaterialE::J_FLUID> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, Duration dt, const vec9& A, vec9& contrib, CalculateContributionAndStoreParticleDataIntermediate& data){
+__forceinline__ __device__ void calculate_contribution_and_store_particle_data<MaterialE::J_FLUID>(const ParticleBuffer<MaterialE::J_FLUID> particle_buffer, const ParticleBuffer<MaterialE::J_FLUID> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, Duration dt, const std::array<float, 9>& A, std::array<float, 9>& contrib, CalculateContributionAndStoreParticleDataIntermediate& data){
 	//Update determinante of deformation gradiant
 	//Divergence of velocity multiplied with time and transfered to global space
 	data.J += (A[0] + A[4] + A[8]) * dt.count() * config::G_D_INV * data.J;
@@ -514,8 +514,9 @@ __forceinline__ __device__ void calculate_contribution_and_store_particle_data<M
 }
 
 template<>
-__forceinline__ __device__ void calculate_contribution_and_store_particle_data<MaterialE::FIXED_COROTATED>(const ParticleBuffer<MaterialE::FIXED_COROTATED> particle_buffer, const ParticleBuffer<MaterialE::FIXED_COROTATED> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, Duration dt, const vec9& A, vec9& contrib, CalculateContributionAndStoreParticleDataIntermediate& data){
+__forceinline__ __device__ void calculate_contribution_and_store_particle_data<MaterialE::FIXED_COROTATED>(const ParticleBuffer<MaterialE::FIXED_COROTATED> particle_buffer, const ParticleBuffer<MaterialE::FIXED_COROTATED> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, Duration dt, const std::array<float, 9>& A, std::array<float, 9>& contrib, CalculateContributionAndStoreParticleDataIntermediate& data){
 	vec3x3 dws;
+	//((d & 0x3) ? 0.f : 1.f) is identity matrix
 	#pragma unroll 9
 	for(int d = 0; d < 9; ++d) {
 		dws.val(d) = A[d] * dt.count() * config::G_D_INV + ((d & 0x3) ? 0.f : 1.f);
@@ -533,7 +534,7 @@ __forceinline__ __device__ void calculate_contribution_and_store_particle_data<M
 		contrib[6]				 = source_particle_bin.val(_9, source_pidib % config::G_BIN_CAPACITY);
 		contrib[7]				 = source_particle_bin.val(_10, source_pidib % config::G_BIN_CAPACITY);
 		contrib[8]				 = source_particle_bin.val(_11, source_pidib % config::G_BIN_CAPACITY);
-		matrix_matrix_multiplication_3d(dws.data_arr(), contrib.data_arr(), F.data_arr());
+		matrix_matrix_multiplication_3d(dws.data_arr(), contrib, F.data_arr());
 		{
 			auto particle_bin									  = next_particle_buffer.ch(_0, next_particle_buffer.bin_offsets[src_blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
 			particle_bin.val(_0, particle_id_in_block % config::G_BIN_CAPACITY)  = data.pos[0];
@@ -550,13 +551,14 @@ __forceinline__ __device__ void calculate_contribution_and_store_particle_data<M
 			particle_bin.val(_11, particle_id_in_block % config::G_BIN_CAPACITY) = F[8];
 		}
 		ComputeStressIntermediate compute_stress_tmp;
-		compute_stress<float, MaterialE::FIXED_COROTATED>(particle_buffer.volume, particle_buffer.mu, particle_buffer.lambda, F, contrib, compute_stress_tmp);
+		compute_stress<float, MaterialE::FIXED_COROTATED>(particle_buffer.volume, particle_buffer.mu, particle_buffer.lambda, F.data_arr(), contrib, compute_stress_tmp);
 	}
 }
 
 template<>
-__forceinline__ __device__ void calculate_contribution_and_store_particle_data<MaterialE::SAND>(const ParticleBuffer<MaterialE::SAND> particle_buffer, const ParticleBuffer<MaterialE::SAND> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, Duration dt, const vec9& A, vec9& contrib, CalculateContributionAndStoreParticleDataIntermediate& data){
+__forceinline__ __device__ void calculate_contribution_and_store_particle_data<MaterialE::SAND>(const ParticleBuffer<MaterialE::SAND> particle_buffer, const ParticleBuffer<MaterialE::SAND> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, Duration dt, const std::array<float, 9>& A, std::array<float, 9>& contrib, CalculateContributionAndStoreParticleDataIntermediate& data){
 	vec3x3 dws;
+	//((d & 0x3) ? 0.f : 1.f) is identity matrix
 	#pragma unroll 9
 	for(int d = 0; d < 9; ++d) {
 		dws.val(d) = A[d] * dt.count() * config::G_D_INV + ((d & 0x3) ? 0.f : 1.f);
@@ -577,14 +579,14 @@ __forceinline__ __device__ void calculate_contribution_and_store_particle_data<M
 		contrib[8]				 = source_particle_bin.val(_11, source_pidib % config::G_BIN_CAPACITY);
 		log_jp					 = source_particle_bin.val(_12, source_pidib % config::G_BIN_CAPACITY);
 
-		matrix_matrix_multiplication_3d(dws.data_arr(), contrib.data_arr(), F.data_arr());
+		matrix_matrix_multiplication_3d(dws.data_arr(), contrib, F.data_arr());
 		ComputeStressIntermediate compute_stress_tmp;
 		compute_stress_tmp.cohesion = particle_buffer.cohesion;
 		compute_stress_tmp.beta = particle_buffer.beta;
 		compute_stress_tmp.yield_surface = particle_buffer.yield_surface;
 		compute_stress_tmp.volume_correction = particle_buffer.volume_correction;
 		compute_stress_tmp.log_jp = log_jp;
-		compute_stress<float, MaterialE::SAND>(particle_buffer.volume, particle_buffer.mu, particle_buffer.lambda, F, contrib, compute_stress_tmp);
+		compute_stress<float, MaterialE::SAND>(particle_buffer.volume, particle_buffer.mu, particle_buffer.lambda, F.data_arr(), contrib, compute_stress_tmp);
 		log_jp = compute_stress_tmp.log_jp;
 		{
 			auto particle_bin									  = next_particle_buffer.ch(_0, next_particle_buffer.bin_offsets[src_blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
@@ -606,8 +608,9 @@ __forceinline__ __device__ void calculate_contribution_and_store_particle_data<M
 }
 
 template<>
-__forceinline__ __device__ void calculate_contribution_and_store_particle_data<MaterialE::NACC>(const ParticleBuffer<MaterialE::NACC> particle_buffer, const ParticleBuffer<MaterialE::NACC> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, Duration dt, const vec9& A, vec9& contrib, CalculateContributionAndStoreParticleDataIntermediate& data){
+__forceinline__ __device__ void calculate_contribution_and_store_particle_data<MaterialE::NACC>(const ParticleBuffer<MaterialE::NACC> particle_buffer, const ParticleBuffer<MaterialE::NACC> next_particle_buffer, int advection_source_blockno, int source_pidib, int src_blockno, int particle_id_in_block, Duration dt, const std::array<float, 9>& A, std::array<float, 9>& contrib, CalculateContributionAndStoreParticleDataIntermediate& data){
 	vec3x3 dws;
+	//((d & 0x3) ? 0.f : 1.f) is identity matrix
 	#pragma unroll 9
 	for(int d = 0; d < 9; ++d) {
 		dws.val(d) = A[d] * dt.count() * config::G_D_INV + ((d & 0x3) ? 0.f : 1.f);
@@ -628,7 +631,7 @@ __forceinline__ __device__ void calculate_contribution_and_store_particle_data<M
 		contrib[8]				 = source_particle_bin.val(_11, source_pidib % config::G_BIN_CAPACITY);
 		log_jp					 = source_particle_bin.val(_12, source_pidib % config::G_BIN_CAPACITY);
 
-		matrix_matrix_multiplication_3d(dws.data_arr(), contrib.data_arr(), F.data_arr());
+		matrix_matrix_multiplication_3d(dws.data_arr(), contrib, F.data_arr());
 		ComputeStressIntermediate compute_stress_tmp;
 		compute_stress_tmp.bm = particle_buffer.bm;
 		compute_stress_tmp.xi = particle_buffer.xi;
@@ -636,7 +639,7 @@ __forceinline__ __device__ void calculate_contribution_and_store_particle_data<M
 		compute_stress_tmp.msqr = particle_buffer.msqr;
 		compute_stress_tmp.hardening_on = particle_buffer.hardening_on;
 		compute_stress_tmp.log_jp = log_jp;
-		compute_stress<float, MaterialE::NACC>(particle_buffer.volume, particle_buffer.mu, particle_buffer.lambda, F, contrib, compute_stress_tmp);
+		compute_stress<float, MaterialE::NACC>(particle_buffer.volume, particle_buffer.mu, particle_buffer.lambda, F.data_arr(), contrib, compute_stress_tmp);
 		log_jp = compute_stress_tmp.log_jp;
 		{
 			auto particle_bin									  = next_particle_buffer.ch(_0, next_particle_buffer.bin_offsets[src_blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
@@ -749,7 +752,7 @@ __global__ void g2p2g(Duration dt, Duration new_dt, const ParticleBuffer<Materia
 			
 			//Retrieve the direction (first stripping the particle id by division)
 			ivec3 offset;
-			dir_components(advect / config::G_PARTICLE_NUM_PER_BLOCK, offset);
+			dir_components(advect / config::G_PARTICLE_NUM_PER_BLOCK, offset.data_arr());
 			
 			//Retrieve the particle id by AND for lower bits
 			source_pidib   = advect & (config::G_PARTICLE_NUM_PER_BLOCK - 1);
@@ -771,7 +774,7 @@ __global__ void g2p2g(Duration dt, Duration new_dt, const ParticleBuffer<Materia
 		float J = fetch_particle_buffer_tmp.J;
 		
 		//Get position of grid cell
-		ivec3 global_base_index = get_block_id(pos) - 1;
+		ivec3 global_base_index = get_block_id(pos.data_arr()) - 1;
 		
 		//Get position relative to grid cell
 		vec3 local_pos		   = pos - global_base_index * config::G_DX;
@@ -839,7 +842,7 @@ __global__ void g2p2g(Duration dt, Duration new_dt, const ParticleBuffer<Materia
 		store_particle_buffer_tmp.J = J;
 
 		vec9 contrib;
-		calculate_contribution_and_store_particle_data<MaterialType>(particle_buffer, next_particle_buffer, advection_source_blockno, source_pidib, src_blockno, particle_id_in_block, dt, A, contrib, store_particle_buffer_tmp);
+		calculate_contribution_and_store_particle_data<MaterialType>(particle_buffer, next_particle_buffer, advection_source_blockno, source_pidib, src_blockno, particle_id_in_block, dt, A.data_arr(), contrib.data_arr(), store_particle_buffer_tmp);
 		
 		//Update momentum?
 		//Multiply A with mass to complete it. Then subtract current momentum?
@@ -847,7 +850,7 @@ __global__ void g2p2g(Duration dt, Duration new_dt, const ParticleBuffer<Materia
 		contrib = (A * particle_buffer.mass - contrib * new_dt.count()) * config::G_D_INV;
 
 		//Calculate grid index after movement
-		ivec3 new_global_base_index = get_block_id(pos) - 1;
+		ivec3 new_global_base_index = get_block_id(pos.data_arr()) - 1;
 		
 		//Update local position
 		local_pos = pos - new_global_base_index * config::G_DX;
@@ -855,7 +858,7 @@ __global__ void g2p2g(Duration dt, Duration new_dt, const ParticleBuffer<Materia
 		//Store index and movement direction
 		{
 			//Calculate direction offset
-			const int dirtag = dir_offset((base_index - 1) / static_cast<int>(config::G_BLOCKSIZE) - (new_global_base_index - 1) / static_cast<int>(config::G_BLOCKSIZE));
+			const int dirtag = dir_offset(((base_index - 1) / static_cast<int>(config::G_BLOCKSIZE) - (new_global_base_index - 1) / static_cast<int>(config::G_BLOCKSIZE)).data_arr());
 			
 			//Store particle in new block
 			next_particle_buffer.add_advection(partition, new_global_base_index - 1, dirtag, particle_id_in_block);
@@ -1099,7 +1102,7 @@ __global__ void retrieve_particle_buffer(Partition partition, Partition prev_par
 		
 		//Retrieve the direction (first stripping the particle id by division)
 		ivec3 source_blockid;
-		dir_components(advect / config::G_PARTICLE_NUM_PER_BLOCK, source_blockid);
+		dir_components(advect / config::G_PARTICLE_NUM_PER_BLOCK, source_blockid.data_arr());
 		
 		//Retrieve the particle id by AND for lower bits
 		const auto source_pidib	= advect % config::G_PARTICLE_NUM_PER_BLOCK;
