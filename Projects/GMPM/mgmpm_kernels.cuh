@@ -351,6 +351,7 @@ __global__ void update_grid_velocity_query_max(uint32_t block_count, Grid grid, 
 			const float mass	  = grid_block.val_1d(_0, cell_id_in_block);
 			float vel_sqr = 0.0f;
 			vec3 vel;
+			vec3 vel_prev;
 			if(mass > 0.0f) {
 				const float mass_inv = 1.f / mass;
 
@@ -362,6 +363,8 @@ __global__ void update_grid_velocity_query_max(uint32_t block_count, Grid grid, 
 				vel[0] = grid_block.val_1d(_1, cell_id_in_block);
 				vel[1] = grid_block.val_1d(_2, cell_id_in_block);
 				vel[2] = grid_block.val_1d(_3, cell_id_in_block);
+				
+				vel_prev = vel;
 
 				//Update velocity. Set to 0 if outside of bounds
 				vel[0] = is_in_bound & 4 ? 0.0f : vel[0] * mass_inv;
@@ -385,6 +388,7 @@ __global__ void update_grid_velocity_query_max(uint32_t block_count, Grid grid, 
 			//If we have nan values, signalize failure by setting max_vel to inf
 			if(isnan(vel_sqr)){
 				vel_sqr = std::numeric_limits<float>::infinity();
+				printf("NAN %.32f %.32f %.32f\n", vel_prev[0], vel_prev[1], vel_prev[2]);
 			}
 			
 			// unsigned activeMask = __ballot_sync(0xffffffff, mv[0] != 0.0f);

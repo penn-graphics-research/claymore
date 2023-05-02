@@ -73,6 +73,7 @@ __forceinline__ __device__ void compute_stress<float, MaterialE::FIXED_COROTATED
 //NOLINTBEGIN(readability-magic-numbers, readability-identifier-naming) Magic numbers are formula specific; Common naming for this physical formulas
 template<>
 __forceinline__ __device__ void compute_stress<float, MaterialE::NACC>(const float volume, const float mu, const float lambda, std::array<float, 9>& F, std::array<float, 9>& PF, ComputeStressIntermediate<float>& data) {
+	//FIXME: Explodes on impact. Not sure why. J gets very low. Clamping of all J prevents crash, but results are still wrong.
 	(void) lambda;
 
 	std::array<float, 9> U = {};
@@ -96,6 +97,13 @@ __forceinline__ __device__ void compute_stress<float, MaterialE::NACC>(const flo
 	float y_p_half			  = (data.msqr * (p_trial - p_min) * (p_trial - p0));
 	float s_hat_trial_sqrnorm = s_hat_trial[0] * s_hat_trial[0] + s_hat_trial[1] * s_hat_trial[1] + s_hat_trial[2] * s_hat_trial[2];
 	float y					  = (y_s_half_coeff * s_hat_trial_sqrnorm) + y_p_half;
+	
+	if(
+		//blockIdx.x == 0 && threadIdx.x == 0
+		Je_trial < 0.1
+	){
+		//printf("%.32f %.32f %.32f, %.32f %.32f %.32f, %.32f %.32f %.32f # %.32f - ", F[0], F[1], F[2], F[3], F[4], F[5], F[6], F[7], F[8], Je_trial);
+	}
 
 	//< 1). update strain and hardening alpha(in log_jp)
 
@@ -210,7 +218,7 @@ __forceinline__ __device__ void compute_stress<float, MaterialE::NACC>(const flo
 
 	///< |f| = P * F^T * Volume
 	float dev_b_coeff = mu * powf(J, -2.f / 3.f);
-	float i_coeff	  = data.bm * .5f * (J * J - 1.f);
+	float i_coeff	  = data.bm * .5f * ((J * J - 1.f) * 0.5f - logf(J));
 	PF[0]		  = (dev_b_coeff * b_dev[0] + i_coeff) * volume;
 	PF[1]		  = (dev_b_coeff * b_dev[1]) * volume;
 	PF[2]		  = (dev_b_coeff * b_dev[2]) * volume;
@@ -220,6 +228,13 @@ __forceinline__ __device__ void compute_stress<float, MaterialE::NACC>(const flo
 	PF[6]		  = (dev_b_coeff * b_dev[6]) * volume;
 	PF[7]		  = (dev_b_coeff * b_dev[7]) * volume;
 	PF[8]		  = (dev_b_coeff * b_dev[8] + i_coeff) * volume;
+	
+	if(
+		//blockIdx.x == 0 && threadIdx.x == 0
+		isnan(PF[0])
+	){
+		//printf("%.32f %.32f %.32f, %.32f %.32f %.32f, %.32f %.32f %.32f # %.32f %.32f %.32f, %.32f %.32f %.32f, %.32f %.32f %.32f # %.32f %.32f - ", F[0], F[1], F[2], F[3], F[4], F[5], F[6], F[7], F[8], b_dev[0], b_dev[1], b_dev[2], b_dev[3], b_dev[4], b_dev[5], b_dev[6], b_dev[7], b_dev[8], i_coeff, J);
+	}
 }
 //NOLINTEND(readability-magic-numbers, readability-identifier-naming)
 
