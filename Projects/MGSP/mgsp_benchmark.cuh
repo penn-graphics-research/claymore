@@ -82,7 +82,7 @@ struct MgspBenchmark {
 			active_block_marks = static_cast<int*>(static_cast<void*>(static_cast<char*>(base) + sizeof(int) * max_block_count));
 			destinations	   = static_cast<int*>(static_cast<void*>(static_cast<char*>(base) + sizeof(int) * max_block_count * 2));
 			sources			   = static_cast<int*>(static_cast<void*>(static_cast<char*>(base) + sizeof(int) * max_block_count * 3));
-			bin_sizes			   = static_cast<int*>(static_cast<void*>(static_cast<char*>(base) + sizeof(int) * max_block_count * 4));
+			bin_sizes		   = static_cast<int*>(static_cast<void*>(static_cast<char*>(base) + sizeof(int) * max_block_count * 4));
 			d_max_vel		   = static_cast<float*>(static_cast<void*>(static_cast<char*>(base) + sizeof(int) * max_block_count * 5));
 			//NOLINTEND(readability-magic-numbers)
 		}
@@ -127,13 +127,13 @@ struct MgspBenchmark {
 	static_assert(std::is_same_v<GridBufferDomain::index_type, int>, "block index type is not int");
 	char rollid;
 	std::array<std::size_t, config::G_DEVICE_COUNT> cur_num_active_blocks				  = {};
-	std::array<std::size_t, config::G_DEVICE_COUNT> cur_num_active_bins				  = {};
+	std::array<std::size_t, config::G_DEVICE_COUNT> cur_num_active_bins					  = {};
 	std::array<std::array<std::size_t, BIN_COUNT>, config::G_DEVICE_COUNT> checked_counts = {};
 	vec<float, config::G_DEVICE_COUNT> max_vels;
 	vec<int, config::G_DEVICE_COUNT> partition_block_count;
 	vec<int, config::G_DEVICE_COUNT> nbcount;
 	vec<int, config::G_DEVICE_COUNT> exterior_block_count;
-	vec<int, config::G_DEVICE_COUNT> bincount;	 ///< num blocks
+	vec<int, config::G_DEVICE_COUNT> bincount;			  ///< num blocks
 	vec<uint32_t, config::G_DEVICE_COUNT> particle_counts;///< num particles
 	std::array<std::vector<float>, config::G_DEVICE_COUNT + 1> durations;
 	std::array<std::vector<std::array<float, config::NUM_DIMENSIONS>>, config::G_DEVICE_COUNT> models;
@@ -227,8 +227,8 @@ struct MgspBenchmark {
 		input_halo_grid_blocks.emplace_back(config::G_DEVICE_COUNT);
 		output_halo_grid_blocks.emplace_back(config::G_DEVICE_COUNT);
 		particles[I]			 = static_cast<ParticleArray>(spawn<particle_array_, orphan_signature>(DeviceAllocator {}));
-		checked_counts[I][0]		 = 0;
-		checked_counts[I][1]		 = 0;
+		checked_counts[I][0]	 = 0;
+		checked_counts[I][1]	 = 0;
 		cur_num_active_blocks[I] = config::G_MAX_ACTIVE_BLOCK;
 		cur_num_active_bins[I]	 = config::G_MAX_PARTICLE_BIN;
 		/// tail-recursion optimization

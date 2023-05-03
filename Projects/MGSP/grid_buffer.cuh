@@ -26,7 +26,7 @@ struct GridBuffer : Instance<grid_buffer_> {
 		: base_t {spawn<grid_buffer_, orphan_signature>(allocator)} {}
 	template<typename Allocator>
 	void check_capacity(Allocator allocator, std::size_t capacity) {
-		if(capacity > this->capacity){
+		if(capacity > this->capacity) {
 			this->resize(allocator, capacity);
 		}
 	}

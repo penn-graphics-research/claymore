@@ -35,18 +35,18 @@ __global__ void build_particle_cell_buckets(uint32_t particle_counts, ParticleAr
 		return;
 	}
 	ivec3 coord {int(std::lround(particle_array.val(_0, particle_id) / config::G_DX) - 2), int(std::lround(particle_array.val(_1, particle_id) / config::G_DX) - 2), int(std::lround(particle_array.val(_2, particle_id) / config::G_DX) - 2)};
-	int cellno																							   = (coord[0] & config::G_BLOCKMASK) * config::G_BLOCKSIZE * config::G_BLOCKSIZE + (coord[1] & config::G_BLOCKMASK) * config::G_BLOCKSIZE + (coord[2] & config::G_BLOCKMASK);
-	coord																								   = coord / static_cast<int>(config::G_BLOCKSIZE);
-	auto blockno																						   = partition.query(coord);
-	auto particle_id_in_cell																							   = atomicAdd(partition.cell_particle_counts + blockno * config::G_BLOCKVOLUME + cellno, 1);
+	int cellno																														   = (coord[0] & config::G_BLOCKMASK) * config::G_BLOCKSIZE * config::G_BLOCKSIZE + (coord[1] & config::G_BLOCKMASK) * config::G_BLOCKSIZE + (coord[2] & config::G_BLOCKMASK);
+	coord																															   = coord / static_cast<int>(config::G_BLOCKSIZE);
+	auto blockno																													   = partition.query(coord);
+	auto particle_id_in_cell																										   = atomicAdd(partition.cell_particle_counts + blockno * config::G_BLOCKVOLUME + cellno, 1);
 	partition.cellbuckets[blockno * config::G_PARTICLE_NUM_PER_BLOCK + cellno * config::G_MAX_PARTICLES_IN_CELL + particle_id_in_cell] = static_cast<int>(particle_id);//NOTE:Explicit narrowing conversation.
 }
 __global__ void cell_bucket_to_block(const int* cell_particle_counts, const int* cellbuckets, int* particle_bucket_sizes, int* buckets) {
-	const int cellno = static_cast<int>(threadIdx.x) & (config::G_BLOCKVOLUME - 1);
-	const int particle_counts	 = cell_particle_counts[blockIdx.x * config::G_BLOCKVOLUME + cellno];
+	const int cellno		  = static_cast<int>(threadIdx.x) & (config::G_BLOCKVOLUME - 1);
+	const int particle_counts = cell_particle_counts[blockIdx.x * config::G_BLOCKVOLUME + cellno];
 	for(int particle_id_in_cell = 0; particle_id_in_cell < config::G_MAX_PARTICLES_IN_CELL; particle_id_in_cell++) {
 		if(particle_id_in_cell < particle_counts) {
-			auto particle_id_in_block													   = atomic_agg_inc<int>(particle_bucket_sizes + blockIdx.x);
+			auto particle_id_in_block													  = atomic_agg_inc<int>(particle_bucket_sizes + blockIdx.x);
 			buckets[blockIdx.x * config::G_PARTICLE_NUM_PER_BLOCK + particle_id_in_block] = cellbuckets[blockIdx.x * config::G_PARTICLE_NUM_PER_BLOCK + cellno * config::G_MAX_PARTICLES_IN_CELL + particle_id_in_cell];
 		}
 		__syncthreads();
@@ -60,8 +60,8 @@ __global__ void compute_bin_capacity(uint32_t block_count, int const* particle_b
 	bin_sizes[blockno] = (particle_bucket_sizes[blockno] + config::G_BIN_CAPACITY - 1) / config::G_BIN_CAPACITY;
 }
 __global__ void init_adv_bucket(const int* particle_bucket_sizes, int* buckets) {
-	int particle_counts	= particle_bucket_sizes[blockIdx.x];
-	int* bucket = buckets + static_cast<size_t>(blockIdx.x) * config::G_PARTICLE_NUM_PER_BLOCK;
+	int particle_counts = particle_bucket_sizes[blockIdx.x];
+	int* bucket			= buckets + static_cast<size_t>(blockIdx.x) * config::G_PARTICLE_NUM_PER_BLOCK;
 	for(int particle_id_in_block = static_cast<int>(threadIdx.x); particle_id_in_block < particle_counts; particle_id_in_block += static_cast<int>(blockDim.x)) {
 		bucket[particle_id_in_block] = (dir_offset(ivec3 {0, 0, 0}) * config::G_PARTICLE_NUM_PER_BLOCK) | particle_id_in_block;
 	}
@@ -149,12 +149,12 @@ __global__ void rasterize(uint32_t particle_counts, const ParticleArray particle
 
 template<typename ParticleArray, typename Partion>
 __global__ void array_to_buffer(ParticleArray particle_array, ParticleBuffer<MaterialE::J_FLUID> particle_buffer, Partion partition) {
-	uint32_t blockno = blockIdx.x;
-	int particle_counts		 = partition.particle_bucket_sizes[blockno];
-	auto* bucket	 = partition.blockbuckets + static_cast<size_t>(blockno) * config::G_PARTICLE_NUM_PER_BLOCK;
+	uint32_t blockno	= blockIdx.x;
+	int particle_counts = partition.particle_bucket_sizes[blockno];
+	auto* bucket		= partition.blockbuckets + static_cast<size_t>(blockno) * config::G_PARTICLE_NUM_PER_BLOCK;
 	for(int particle_id_in_block = static_cast<int>(threadIdx.x); particle_id_in_block < particle_counts; particle_id_in_block += static_cast<int>(blockDim.x)) {
-		auto particle_id = bucket[particle_id_in_block];
-		auto particle_bin  = particle_buffer.ch(_0, partition.bin_offsets[blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
+		auto particle_id  = bucket[particle_id_in_block];
+		auto particle_bin = particle_buffer.ch(_0, partition.bin_offsets[blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
 		/// pos
 		particle_bin.val(_0, particle_id_in_block % config::G_BIN_CAPACITY) = particle_array.val(_0, particle_id);
 		particle_bin.val(_1, particle_id_in_block % config::G_BIN_CAPACITY) = particle_array.val(_1, particle_id);
@@ -166,24 +166,24 @@ __global__ void array_to_buffer(ParticleArray particle_array, ParticleBuffer<Mat
 
 template<typename ParticleArray, typename Partion>
 __global__ void array_to_buffer(ParticleArray particle_array, ParticleBuffer<MaterialE::FIXED_COROTATED> particle_buffer, Partion partition) {
-	uint32_t blockno = blockIdx.x;
-	int particle_counts		 = partition.particle_bucket_sizes[blockno];
-	auto* bucket	 = partition.blockbuckets + static_cast<size_t>(blockno) * config::G_PARTICLE_NUM_PER_BLOCK;
+	uint32_t blockno	= blockIdx.x;
+	int particle_counts = partition.particle_bucket_sizes[blockno];
+	auto* bucket		= partition.blockbuckets + static_cast<size_t>(blockno) * config::G_PARTICLE_NUM_PER_BLOCK;
 	for(int particle_id_in_block = static_cast<int>(threadIdx.x); particle_id_in_block < particle_counts; particle_id_in_block += static_cast<int>(blockDim.x)) {
-		auto particle_id = bucket[particle_id_in_block];
-		auto particle_bin  = particle_buffer.ch(_0, partition.bin_offsets[blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
+		auto particle_id  = bucket[particle_id_in_block];
+		auto particle_bin = particle_buffer.ch(_0, partition.bin_offsets[blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
 		/// pos
 		particle_bin.val(_0, particle_id_in_block % config::G_BIN_CAPACITY) = particle_array.val(_0, particle_id);
 		particle_bin.val(_1, particle_id_in_block % config::G_BIN_CAPACITY) = particle_array.val(_1, particle_id);
 		particle_bin.val(_2, particle_id_in_block % config::G_BIN_CAPACITY) = particle_array.val(_2, particle_id);
 		/// F
-		particle_bin.val(_3, particle_id_in_block % config::G_BIN_CAPACITY)  = 1.f;
-		particle_bin.val(_4, particle_id_in_block % config::G_BIN_CAPACITY)  = 0.f;
-		particle_bin.val(_5, particle_id_in_block % config::G_BIN_CAPACITY)  = 0.f;
-		particle_bin.val(_6, particle_id_in_block % config::G_BIN_CAPACITY)  = 0.f;
-		particle_bin.val(_7, particle_id_in_block % config::G_BIN_CAPACITY)  = 1.f;
-		particle_bin.val(_8, particle_id_in_block % config::G_BIN_CAPACITY)  = 0.f;
-		particle_bin.val(_9, particle_id_in_block % config::G_BIN_CAPACITY)  = 0.f;
+		particle_bin.val(_3, particle_id_in_block % config::G_BIN_CAPACITY)	 = 1.f;
+		particle_bin.val(_4, particle_id_in_block % config::G_BIN_CAPACITY)	 = 0.f;
+		particle_bin.val(_5, particle_id_in_block % config::G_BIN_CAPACITY)	 = 0.f;
+		particle_bin.val(_6, particle_id_in_block % config::G_BIN_CAPACITY)	 = 0.f;
+		particle_bin.val(_7, particle_id_in_block % config::G_BIN_CAPACITY)	 = 1.f;
+		particle_bin.val(_8, particle_id_in_block % config::G_BIN_CAPACITY)	 = 0.f;
+		particle_bin.val(_9, particle_id_in_block % config::G_BIN_CAPACITY)	 = 0.f;
 		particle_bin.val(_10, particle_id_in_block % config::G_BIN_CAPACITY) = 0.f;
 		particle_bin.val(_11, particle_id_in_block % config::G_BIN_CAPACITY) = 1.f;
 	}
@@ -191,24 +191,24 @@ __global__ void array_to_buffer(ParticleArray particle_array, ParticleBuffer<Mat
 
 template<typename ParticleArray, typename Partion>
 __global__ void array_to_buffer(ParticleArray particle_array, ParticleBuffer<MaterialE::SAND> particle_buffer, Partion partition) {
-	uint32_t blockno = blockIdx.x;
-	int particle_counts		 = partition.particle_bucket_sizes[blockno];
-	auto* bucket	 = partition.blockbuckets + static_cast<size_t>(blockno) * config::G_PARTICLE_NUM_PER_BLOCK;
+	uint32_t blockno	= blockIdx.x;
+	int particle_counts = partition.particle_bucket_sizes[blockno];
+	auto* bucket		= partition.blockbuckets + static_cast<size_t>(blockno) * config::G_PARTICLE_NUM_PER_BLOCK;
 	for(int particle_id_in_block = static_cast<int>(threadIdx.x); particle_id_in_block < particle_counts; particle_id_in_block += static_cast<int>(blockDim.x)) {
-		auto particle_id = bucket[particle_id_in_block];
-		auto particle_bin  = particle_buffer.ch(_0, partition.bin_offsets[blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
+		auto particle_id  = bucket[particle_id_in_block];
+		auto particle_bin = particle_buffer.ch(_0, partition.bin_offsets[blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
 		/// pos
 		particle_bin.val(_0, particle_id_in_block % config::G_BIN_CAPACITY) = particle_array.val(_0, particle_id);
 		particle_bin.val(_1, particle_id_in_block % config::G_BIN_CAPACITY) = particle_array.val(_1, particle_id);
 		particle_bin.val(_2, particle_id_in_block % config::G_BIN_CAPACITY) = particle_array.val(_2, particle_id);
 		/// F
-		particle_bin.val(_3, particle_id_in_block % config::G_BIN_CAPACITY)  = 1.f;
-		particle_bin.val(_4, particle_id_in_block % config::G_BIN_CAPACITY)  = 0.f;
-		particle_bin.val(_5, particle_id_in_block % config::G_BIN_CAPACITY)  = 0.f;
-		particle_bin.val(_6, particle_id_in_block % config::G_BIN_CAPACITY)  = 0.f;
-		particle_bin.val(_7, particle_id_in_block % config::G_BIN_CAPACITY)  = 1.f;
-		particle_bin.val(_8, particle_id_in_block % config::G_BIN_CAPACITY)  = 0.f;
-		particle_bin.val(_9, particle_id_in_block % config::G_BIN_CAPACITY)  = 0.f;
+		particle_bin.val(_3, particle_id_in_block % config::G_BIN_CAPACITY)	 = 1.f;
+		particle_bin.val(_4, particle_id_in_block % config::G_BIN_CAPACITY)	 = 0.f;
+		particle_bin.val(_5, particle_id_in_block % config::G_BIN_CAPACITY)	 = 0.f;
+		particle_bin.val(_6, particle_id_in_block % config::G_BIN_CAPACITY)	 = 0.f;
+		particle_bin.val(_7, particle_id_in_block % config::G_BIN_CAPACITY)	 = 1.f;
+		particle_bin.val(_8, particle_id_in_block % config::G_BIN_CAPACITY)	 = 0.f;
+		particle_bin.val(_9, particle_id_in_block % config::G_BIN_CAPACITY)	 = 0.f;
 		particle_bin.val(_10, particle_id_in_block % config::G_BIN_CAPACITY) = 0.f;
 		particle_bin.val(_11, particle_id_in_block % config::G_BIN_CAPACITY) = 1.f;
 		/// log_jp
@@ -218,24 +218,24 @@ __global__ void array_to_buffer(ParticleArray particle_array, ParticleBuffer<Mat
 
 template<typename ParticleArray, typename Partion>
 __global__ void array_to_buffer(ParticleArray particle_array, ParticleBuffer<MaterialE::NACC> particle_buffer, Partion partition) {
-	uint32_t blockno = blockIdx.x;
-	int particle_counts		 = partition.particle_bucket_sizes[blockno];
-	auto* bucket	 = partition.blockbuckets + static_cast<size_t>(blockno) * config::G_PARTICLE_NUM_PER_BLOCK;
+	uint32_t blockno	= blockIdx.x;
+	int particle_counts = partition.particle_bucket_sizes[blockno];
+	auto* bucket		= partition.blockbuckets + static_cast<size_t>(blockno) * config::G_PARTICLE_NUM_PER_BLOCK;
 	for(int particle_id_in_block = static_cast<int>(threadIdx.x); particle_id_in_block < particle_counts; particle_id_in_block += static_cast<int>(blockDim.x)) {
-		auto particle_id = bucket[particle_id_in_block];
-		auto particle_bin  = particle_buffer.ch(_0, partition.bin_offsets[blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
+		auto particle_id  = bucket[particle_id_in_block];
+		auto particle_bin = particle_buffer.ch(_0, partition.bin_offsets[blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
 		/// pos
 		particle_bin.val(_0, particle_id_in_block % config::G_BIN_CAPACITY) = particle_array.val(_0, particle_id);
 		particle_bin.val(_1, particle_id_in_block % config::G_BIN_CAPACITY) = particle_array.val(_1, particle_id);
 		particle_bin.val(_2, particle_id_in_block % config::G_BIN_CAPACITY) = particle_array.val(_2, particle_id);
 		/// F
-		particle_bin.val(_3, particle_id_in_block % config::G_BIN_CAPACITY)  = 1.f;
-		particle_bin.val(_4, particle_id_in_block % config::G_BIN_CAPACITY)  = 0.f;
-		particle_bin.val(_5, particle_id_in_block % config::G_BIN_CAPACITY)  = 0.f;
-		particle_bin.val(_6, particle_id_in_block % config::G_BIN_CAPACITY)  = 0.f;
-		particle_bin.val(_7, particle_id_in_block % config::G_BIN_CAPACITY)  = 1.f;
-		particle_bin.val(_8, particle_id_in_block % config::G_BIN_CAPACITY)  = 0.f;
-		particle_bin.val(_9, particle_id_in_block % config::G_BIN_CAPACITY)  = 0.f;
+		particle_bin.val(_3, particle_id_in_block % config::G_BIN_CAPACITY)	 = 1.f;
+		particle_bin.val(_4, particle_id_in_block % config::G_BIN_CAPACITY)	 = 0.f;
+		particle_bin.val(_5, particle_id_in_block % config::G_BIN_CAPACITY)	 = 0.f;
+		particle_bin.val(_6, particle_id_in_block % config::G_BIN_CAPACITY)	 = 0.f;
+		particle_bin.val(_7, particle_id_in_block % config::G_BIN_CAPACITY)	 = 1.f;
+		particle_bin.val(_8, particle_id_in_block % config::G_BIN_CAPACITY)	 = 0.f;
+		particle_bin.val(_9, particle_id_in_block % config::G_BIN_CAPACITY)	 = 0.f;
 		particle_bin.val(_10, particle_id_in_block % config::G_BIN_CAPACITY) = 0.f;
 		particle_bin.val(_11, particle_id_in_block % config::G_BIN_CAPACITY) = 1.f;
 		/// log_jp
@@ -245,7 +245,7 @@ __global__ void array_to_buffer(ParticleArray particle_array, ParticleBuffer<Mat
 
 template<typename Grid, typename Partition>
 __global__ void update_grid_velocity_query_max(uint32_t block_count, Grid grid, Partition partition, float dt, float* max_vel) {
-	const int boundary_condition				   = static_cast<int>(std::floor(config::G_BOUNDARY_CONDITION));
+	const int boundary_condition   = static_cast<int>(std::floor(config::G_BOUNDARY_CONDITION));
 	constexpr int NUM_WARPS		   = config::G_NUM_GRID_BLOCKS_PER_CUDA_BLOCK * config::G_NUM_WARPS_PER_GRID_BLOCK;
 	constexpr unsigned ACTIVE_MASK = 0xffffffff;
 	//__shared__ float sh_maxvels[config::G_BLOCKVOLUME * config::G_NUM_GRID_BLOCKS_PER_CUDA_BLOCK
@@ -322,7 +322,7 @@ __global__ void update_grid_velocity_query_max(uint32_t block_count, Grid grid, 
 
 template<typename Grid, typename Partition, typename Boundary>
 __global__ void update_grid_velocity_query_max(uint32_t block_count, Grid grid, Partition partition, float dt, Boundary boundary, float* max_vel) {
-	const int boundary_condition				   = static_cast<int>(std::floor(config::G_BOUNDARY_CONDITION));
+	const int boundary_condition   = static_cast<int>(std::floor(config::G_BOUNDARY_CONDITION));
 	constexpr int NUM_WARPS		   = config::G_NUM_GRID_BLOCKS_PER_CUDA_BLOCK * config::G_NUM_WARPS_PER_GRID_BLOCK;
 	constexpr unsigned ACTIVE_MASK = 0xffffffff;
 	//__shared__ float sh_maxvels[config::G_BLOCKVOLUME * config::G_NUM_GRID_BLOCKS_PER_CUDA_BLOCK
@@ -361,7 +361,7 @@ __global__ void update_grid_velocity_query_max(uint32_t block_count, Grid grid, 
 
 				ivec3 cellid {(cell_id_in_block & 0x30) >> 4, (cell_id_in_block & 0xc) >> 2, cell_id_in_block & 0x3};
 				boundary.detect_and_resolve_collision(blockid, cellid, 0.f, vel);
-				vel_sqr						 = vel.dot(vel);
+				vel_sqr									= vel.dot(vel);
 				grid_block.val_1d(_1, cell_id_in_block) = vel[0];
 				vel_sqr += vel[0] * vel[0];
 
@@ -430,8 +430,8 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 		}
 		blockid = partition.active_keys[blockIdx.x];
 
-		int src_blockno = static_cast<int>(blockIdx.x);
-		int particle_bucket_size			= next_particle_buffer.particle_bucket_sizes[src_blockno];
+		int src_blockno			 = static_cast<int>(blockIdx.x);
+		int particle_bucket_size = next_particle_buffer.particle_bucket_sizes[src_blockno];
 		if(particle_bucket_size == 0) {
 			return;
 		}
@@ -486,7 +486,7 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 			dir_components(advect / config::G_PARTICLE_NUM_PER_BLOCK, base_index);
 			base_index += blockid;
 			advection_source_blockno = prev_partition.query(base_index);
-			source_pidib   = advect & (config::G_PARTICLE_NUM_PER_BLOCK - 1);
+			source_pidib			 = advect & (config::G_PARTICLE_NUM_PER_BLOCK - 1);
 			advection_source_blockno = prev_partition.bin_offsets[advection_source_blockno] + source_pidib / config::G_BIN_CAPACITY;
 		}
 		vec3 pos;
@@ -564,7 +564,7 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 			}
 			contrib = (C * particle_buffer.mass - contrib * new_dt) * config::G_D_INV;
 			{
-				auto particle_bin									 = next_particle_buffer.ch(_0, partition.bin_offsets[src_blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
+				auto particle_bin													= next_particle_buffer.ch(_0, partition.bin_offsets[src_blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
 				particle_bin.val(_0, particle_id_in_block % config::G_BIN_CAPACITY) = pos[0];
 				particle_bin.val(_1, particle_id_in_block % config::G_BIN_CAPACITY) = pos[1];
 				particle_bin.val(_2, particle_id_in_block % config::G_BIN_CAPACITY) = pos[2];
@@ -671,8 +671,8 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 		}
 		blockid = partition.active_keys[blockIdx.x];
 
-		int src_blockno = static_cast<int>(blockIdx.x);
-		int particle_bucket_size			= next_particle_buffer.particle_bucket_sizes[src_blockno];
+		int src_blockno			 = static_cast<int>(blockIdx.x);
+		int particle_bucket_size = next_particle_buffer.particle_bucket_sizes[src_blockno];
 		if(particle_bucket_size == 0) {
 			return;
 		}
@@ -728,7 +728,7 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 			dir_components(advect / config::G_PARTICLE_NUM_PER_BLOCK, base_index);
 			base_index += blockid;
 			advection_source_blockno = prev_partition.query(base_index);
-			source_pidib   = advect & (config::G_PARTICLE_NUM_PER_BLOCK - 1);
+			source_pidib			 = advect & (config::G_PARTICLE_NUM_PER_BLOCK - 1);
 			advection_source_blockno = prev_partition.bin_offsets[advection_source_blockno] + source_pidib / config::G_BIN_CAPACITY;
 		}
 		vec3 pos;
@@ -801,17 +801,17 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 			contrib[8]				 = source_particle_bin.val(_11, source_pidib % config::G_BIN_CAPACITY);
 			matrix_matrix_multiplication_3d(dws.data_arr(), contrib.data_arr(), F.data_arr());
 			{
-				auto particle_bin									  = next_particle_buffer.ch(_0, partition.bin_offsets[src_blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
-				particle_bin.val(_0, particle_id_in_block % config::G_BIN_CAPACITY)  = pos[0];
-				particle_bin.val(_1, particle_id_in_block % config::G_BIN_CAPACITY)  = pos[1];
-				particle_bin.val(_2, particle_id_in_block % config::G_BIN_CAPACITY)  = pos[2];
-				particle_bin.val(_3, particle_id_in_block % config::G_BIN_CAPACITY)  = F[0];
-				particle_bin.val(_4, particle_id_in_block % config::G_BIN_CAPACITY)  = F[1];
-				particle_bin.val(_5, particle_id_in_block % config::G_BIN_CAPACITY)  = F[2];
-				particle_bin.val(_6, particle_id_in_block % config::G_BIN_CAPACITY)  = F[3];
-				particle_bin.val(_7, particle_id_in_block % config::G_BIN_CAPACITY)  = F[4];
-				particle_bin.val(_8, particle_id_in_block % config::G_BIN_CAPACITY)  = F[5];
-				particle_bin.val(_9, particle_id_in_block % config::G_BIN_CAPACITY)  = F[6];
+				auto particle_bin													 = next_particle_buffer.ch(_0, partition.bin_offsets[src_blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
+				particle_bin.val(_0, particle_id_in_block % config::G_BIN_CAPACITY)	 = pos[0];
+				particle_bin.val(_1, particle_id_in_block % config::G_BIN_CAPACITY)	 = pos[1];
+				particle_bin.val(_2, particle_id_in_block % config::G_BIN_CAPACITY)	 = pos[2];
+				particle_bin.val(_3, particle_id_in_block % config::G_BIN_CAPACITY)	 = F[0];
+				particle_bin.val(_4, particle_id_in_block % config::G_BIN_CAPACITY)	 = F[1];
+				particle_bin.val(_5, particle_id_in_block % config::G_BIN_CAPACITY)	 = F[2];
+				particle_bin.val(_6, particle_id_in_block % config::G_BIN_CAPACITY)	 = F[3];
+				particle_bin.val(_7, particle_id_in_block % config::G_BIN_CAPACITY)	 = F[4];
+				particle_bin.val(_8, particle_id_in_block % config::G_BIN_CAPACITY)	 = F[5];
+				particle_bin.val(_9, particle_id_in_block % config::G_BIN_CAPACITY)	 = F[6];
 				particle_bin.val(_10, particle_id_in_block % config::G_BIN_CAPACITY) = F[7];
 				particle_bin.val(_11, particle_id_in_block % config::G_BIN_CAPACITY) = F[8];
 			}
@@ -917,8 +917,8 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 		}
 		blockid = partition.active_keys[blockIdx.x];
 
-		int src_blockno = static_cast<int>(blockIdx.x);
-		int particle_bucket_size			= next_particle_buffer.particle_bucket_sizes[src_blockno];
+		int src_blockno			 = static_cast<int>(blockIdx.x);
+		int particle_bucket_size = next_particle_buffer.particle_bucket_sizes[src_blockno];
 		if(particle_bucket_size == 0) {
 			return;
 		}
@@ -973,7 +973,7 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 			dir_components(advect / config::G_PARTICLE_NUM_PER_BLOCK, base_index);
 			base_index += blockid;
 			advection_source_blockno = prev_partition.query(base_index);
-			source_pidib   = advect & (config::G_PARTICLE_NUM_PER_BLOCK - 1);
+			source_pidib			 = advect & (config::G_PARTICLE_NUM_PER_BLOCK - 1);
 			advection_source_blockno = prev_partition.bin_offsets[advection_source_blockno] + source_pidib / config::G_BIN_CAPACITY;
 		}
 		vec3 pos;
@@ -1050,17 +1050,17 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 			matrix_matrix_multiplication_3d(dws.data_arr(), contrib.data_arr(), F.data_arr());
 			compute_stress_sand(particle_buffer.volume, particle_buffer.mu, particle_buffer.lambda, particle_buffer.cohesion, particle_buffer.beta, particle_buffer.yield_surface, particle_buffer.volume_correction, log_jp, F, contrib);
 			{
-				auto particle_bin									  = next_particle_buffer.ch(_0, partition.bin_offsets[src_blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
-				particle_bin.val(_0, particle_id_in_block % config::G_BIN_CAPACITY)  = pos[0];
-				particle_bin.val(_1, particle_id_in_block % config::G_BIN_CAPACITY)  = pos[1];
-				particle_bin.val(_2, particle_id_in_block % config::G_BIN_CAPACITY)  = pos[2];
-				particle_bin.val(_3, particle_id_in_block % config::G_BIN_CAPACITY)  = F[0];
-				particle_bin.val(_4, particle_id_in_block % config::G_BIN_CAPACITY)  = F[1];
-				particle_bin.val(_5, particle_id_in_block % config::G_BIN_CAPACITY)  = F[2];
-				particle_bin.val(_6, particle_id_in_block % config::G_BIN_CAPACITY)  = F[3];
-				particle_bin.val(_7, particle_id_in_block % config::G_BIN_CAPACITY)  = F[4];
-				particle_bin.val(_8, particle_id_in_block % config::G_BIN_CAPACITY)  = F[5];
-				particle_bin.val(_9, particle_id_in_block % config::G_BIN_CAPACITY)  = F[6];
+				auto particle_bin													 = next_particle_buffer.ch(_0, partition.bin_offsets[src_blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
+				particle_bin.val(_0, particle_id_in_block % config::G_BIN_CAPACITY)	 = pos[0];
+				particle_bin.val(_1, particle_id_in_block % config::G_BIN_CAPACITY)	 = pos[1];
+				particle_bin.val(_2, particle_id_in_block % config::G_BIN_CAPACITY)	 = pos[2];
+				particle_bin.val(_3, particle_id_in_block % config::G_BIN_CAPACITY)	 = F[0];
+				particle_bin.val(_4, particle_id_in_block % config::G_BIN_CAPACITY)	 = F[1];
+				particle_bin.val(_5, particle_id_in_block % config::G_BIN_CAPACITY)	 = F[2];
+				particle_bin.val(_6, particle_id_in_block % config::G_BIN_CAPACITY)	 = F[3];
+				particle_bin.val(_7, particle_id_in_block % config::G_BIN_CAPACITY)	 = F[4];
+				particle_bin.val(_8, particle_id_in_block % config::G_BIN_CAPACITY)	 = F[5];
+				particle_bin.val(_9, particle_id_in_block % config::G_BIN_CAPACITY)	 = F[6];
 				particle_bin.val(_10, particle_id_in_block % config::G_BIN_CAPACITY) = F[7];
 				particle_bin.val(_11, particle_id_in_block % config::G_BIN_CAPACITY) = F[8];
 				particle_bin.val(_12, particle_id_in_block % config::G_BIN_CAPACITY) = log_jp;
@@ -1168,8 +1168,8 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 		}
 		blockid = partition.active_keys[blockIdx.x];
 
-		int src_blockno = static_cast<int>(blockIdx.x);
-		int particle_bucket_size			= next_particle_buffer.particle_bucket_sizes[src_blockno];
+		int src_blockno			 = static_cast<int>(blockIdx.x);
+		int particle_bucket_size = next_particle_buffer.particle_bucket_sizes[src_blockno];
 		if(particle_bucket_size == 0) {
 			return;
 		}
@@ -1224,7 +1224,7 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 			dir_components(advect / config::G_PARTICLE_NUM_PER_BLOCK, base_index);
 			base_index += blockid;
 			advection_source_blockno = prev_partition.query(base_index);
-			source_pidib   = advect & (config::G_PARTICLE_NUM_PER_BLOCK - 1);
+			source_pidib			 = advect & (config::G_PARTICLE_NUM_PER_BLOCK - 1);
 			advection_source_blockno = prev_partition.bin_offsets[advection_source_blockno] + source_pidib / config::G_BIN_CAPACITY;
 		}
 		vec3 pos;
@@ -1301,17 +1301,17 @@ __global__ void g2p2g(float dt, float new_dt, const ivec3* __restrict__ blocks, 
 			matrix_matrix_multiplication_3d(dws.data_arr(), contrib.data_arr(), F.data_arr());
 			compute_stress_nacc(particle_buffer.volume, particle_buffer.mu, particle_buffer.lambda, particle_buffer.bm, particle_buffer.xi, particle_buffer.beta, particle_buffer.msqr, particle_buffer.hardening_on, log_jp, F, contrib);
 			{
-				auto particle_bin									  = next_particle_buffer.ch(_0, partition.bin_offsets[src_blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
-				particle_bin.val(_0, particle_id_in_block % config::G_BIN_CAPACITY)  = pos[0];
-				particle_bin.val(_1, particle_id_in_block % config::G_BIN_CAPACITY)  = pos[1];
-				particle_bin.val(_2, particle_id_in_block % config::G_BIN_CAPACITY)  = pos[2];
-				particle_bin.val(_3, particle_id_in_block % config::G_BIN_CAPACITY)  = F[0];
-				particle_bin.val(_4, particle_id_in_block % config::G_BIN_CAPACITY)  = F[1];
-				particle_bin.val(_5, particle_id_in_block % config::G_BIN_CAPACITY)  = F[2];
-				particle_bin.val(_6, particle_id_in_block % config::G_BIN_CAPACITY)  = F[3];
-				particle_bin.val(_7, particle_id_in_block % config::G_BIN_CAPACITY)  = F[4];
-				particle_bin.val(_8, particle_id_in_block % config::G_BIN_CAPACITY)  = F[5];
-				particle_bin.val(_9, particle_id_in_block % config::G_BIN_CAPACITY)  = F[6];
+				auto particle_bin													 = next_particle_buffer.ch(_0, partition.bin_offsets[src_blockno] + particle_id_in_block / config::G_BIN_CAPACITY);
+				particle_bin.val(_0, particle_id_in_block % config::G_BIN_CAPACITY)	 = pos[0];
+				particle_bin.val(_1, particle_id_in_block % config::G_BIN_CAPACITY)	 = pos[1];
+				particle_bin.val(_2, particle_id_in_block % config::G_BIN_CAPACITY)	 = pos[2];
+				particle_bin.val(_3, particle_id_in_block % config::G_BIN_CAPACITY)	 = F[0];
+				particle_bin.val(_4, particle_id_in_block % config::G_BIN_CAPACITY)	 = F[1];
+				particle_bin.val(_5, particle_id_in_block % config::G_BIN_CAPACITY)	 = F[2];
+				particle_bin.val(_6, particle_id_in_block % config::G_BIN_CAPACITY)	 = F[3];
+				particle_bin.val(_7, particle_id_in_block % config::G_BIN_CAPACITY)	 = F[4];
+				particle_bin.val(_8, particle_id_in_block % config::G_BIN_CAPACITY)	 = F[5];
+				particle_bin.val(_9, particle_id_in_block % config::G_BIN_CAPACITY)	 = F[6];
 				particle_bin.val(_10, particle_id_in_block % config::G_BIN_CAPACITY) = F[7];
 				particle_bin.val(_11, particle_id_in_block % config::G_BIN_CAPACITY) = F[8];
 				particle_bin.val(_12, particle_id_in_block % config::G_BIN_CAPACITY) = log_jp;
@@ -1416,7 +1416,7 @@ __global__ void update_partition(uint32_t block_count, const int* __restrict__ s
 		return;
 	}
 	if(threadIdx.x == 0) {
-		source_no[0]							= source_nos[blockno];
+		source_no[0]						= source_nos[blockno];
 		auto source_blockid					= partition.active_keys[source_no[0]];
 		next_partition.active_keys[blockno] = source_blockid;
 		next_partition.reinsert(static_cast<int>(blockno));
@@ -1513,7 +1513,7 @@ __global__ void check_partition_domain(uint32_t block_count, int did, Domain con
 
 template<typename Partition, typename ParticleBuffer, typename ParticleArray>
 __global__ void retrieve_particle_buffer(Partition partition, Partition prev_partition, ParticleBuffer particle_buffer, ParticleArray particle_array, int* parcount) {
-	int particle_counts			  = partition.particle_bucket_sizes[blockIdx.x];
+	int particle_counts	  = partition.particle_bucket_sizes[blockIdx.x];
 	ivec3 blockid		  = partition.active_keys[blockIdx.x];
 	auto advection_bucket = partition.blockbuckets + blockIdx.x * config::G_PARTICLE_NUM_PER_BLOCK;
 	// auto particle_offset = partition.bin_offsets[blockIdx.x];
@@ -1523,9 +1523,9 @@ __global__ void retrieve_particle_buffer(Partition partition, Partition prev_par
 		dir_components(advect / config::G_PARTICLE_NUM_PER_BLOCK, source_blockid);
 		source_blockid += blockid;
 		auto advection_source_blockno = prev_partition.query(source_blockid);
-		auto source_pidib	= advect % config::G_PARTICLE_NUM_PER_BLOCK;
-		auto source_bin		= particle_buffer.ch(_0, prev_partition.bin_offsets[advection_source_blockno] + source_pidib / config::G_BIN_CAPACITY);
-		auto _source_pidib	= source_pidib % config::G_BIN_CAPACITY;
+		auto source_pidib			  = advect % config::G_PARTICLE_NUM_PER_BLOCK;
+		auto source_bin				  = particle_buffer.ch(_0, prev_partition.bin_offsets[advection_source_blockno] + source_pidib / config::G_BIN_CAPACITY);
+		auto _source_pidib			  = source_pidib % config::G_BIN_CAPACITY;
 
 		auto particle_id = atomicAdd(parcount, 1);
 		/// pos

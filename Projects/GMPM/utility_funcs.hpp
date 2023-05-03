@@ -18,7 +18,7 @@ constexpr vec3 bspline_weight(float p) {
 	return dw;
 }
 
-constexpr ivec3 get_block_id(const std::array<float, 3>& position){
+constexpr ivec3 get_block_id(const std::array<float, 3>& position) {
 	return ivec3(static_cast<int>(std::lround(position[0] * config::G_DX_INV)), static_cast<int>(std::lround(position[1] * config::G_DX_INV)), static_cast<int>(std::lround(position[2] * config::G_DX_INV)));
 }
 
@@ -41,7 +41,7 @@ constexpr Duration compute_dt(float max_vel, const Duration cur_time, const Dura
 		const Duration new_dt(config::G_DX * config::CFL / max_vel);
 		dt = std::min(new_dt, dt);
 	}
-	
+
 	//If next_time - cur_time is smaller as current dt, use this.
 	dt = std::min(dt, next_time - cur_time);
 

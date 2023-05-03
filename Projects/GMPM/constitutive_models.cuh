@@ -11,10 +11,10 @@
 #define USE_JOSH_FRACTURE_PAPER 1//Selects which solve is used
 
 namespace mn {
-	
+
 //Need this, cause we cannot partially instantiate function templates in current c++ version
 template<typename T = float>
-struct ComputeStressIntermediate{
+struct ComputeStressIntermediate {
 	T bm;
 	T xi;
 	T beta;
@@ -26,13 +26,17 @@ struct ComputeStressIntermediate{
 	bool volume_correction;
 };
 
+//NOLINTBEGIN(readability-magic-numbers, readability-identifier-naming) Magic numbers are formula specific; Common naming for this physical formulas
 template<typename T = float, MaterialE MaterialType>
 __forceinline__ __device__ void compute_stress(const T volume, const T mu, const T lambda, std::array<T, 9>& F, std::array<T, 9>& PF, ComputeStressIntermediate<T>& data);
+//NOLINTEND(readability-magic-numbers, readability-identifier-naming)
 
 //TODO: But maybe use names instead for better understanding
 //NOLINTBEGIN(readability-magic-numbers, readability-identifier-naming) Magic numbers are formula specific; Common naming for this physical formulas
 template<>
 __forceinline__ __device__ void compute_stress<float, MaterialE::FIXED_COROTATED>(const float volume, const float mu, const float lambda, std::array<float, 9>& F, std::array<float, 9>& PF, ComputeStressIntermediate<float>& data) {
+	(void) data;
+
 	std::array<float, 9> U = {};
 	std::array<float, 3> S = {};
 	std::array<float, 9> V = {};
@@ -97,7 +101,7 @@ __forceinline__ __device__ void compute_stress<float, MaterialE::NACC>(const flo
 	float y_p_half			  = (data.msqr * (p_trial - p_min) * (p_trial - p0));
 	float s_hat_trial_sqrnorm = s_hat_trial[0] * s_hat_trial[0] + s_hat_trial[1] * s_hat_trial[1] + s_hat_trial[2] * s_hat_trial[2];
 	float y					  = (y_s_half_coeff * s_hat_trial_sqrnorm) + y_p_half;
-	
+
 	if(
 		//blockIdx.x == 0 && threadIdx.x == 0
 		Je_trial < 0.1
@@ -110,7 +114,7 @@ __forceinline__ __device__ void compute_stress<float, MaterialE::NACC>(const flo
 	///< case 1, project to max tip of YS
 	if(p_trial > p0) {
 		float Je_new = sqrtf(-2.f * p0 / data.bm + 1.f);
-		S[0] = S[1] = S[2]	   = powf(Je_new, 1.f / 3.f);
+		S[0] = S[1] = S[2]		   = powf(Je_new, 1.f / 3.f);
 		std::array<float, 9> New_F = {};
 		matmul_mat_diag_mat_t_3d(New_F, U, S, V);
 #pragma unroll 9
@@ -125,7 +129,7 @@ __forceinline__ __device__ void compute_stress<float, MaterialE::NACC>(const flo
 	/// case 2, project to min tip of YS
 	else if(p_trial < p_min) {
 		float Je_new = sqrtf(-2.f * p_min / data.bm + 1.f);
-		S[0] = S[1] = S[2]	   = powf(Je_new, 1.f / 3.f);
+		S[0] = S[1] = S[2]		   = powf(Je_new, 1.f / 3.f);
 		std::array<float, 9> New_F = {};
 		matmul_mat_diag_mat_t_3d(New_F, U, S, V);
 #pragma unroll 9
@@ -201,34 +205,26 @@ __forceinline__ __device__ void compute_stress<float, MaterialE::NACC>(const flo
 	std::array<float, 9> b	   = {};
 	matrix_matrix_tranpose_multiplication_3d(F, b);
 	matrix_deviatoric_3d(b, b_dev);
-	
+
 	//FIXME: Fail-safe test  for precision error caused by compiler. Not placed in matrix_deviatoric_3d cause error does not seem to be detectable in there
-	if(
-		   b[0] == 1.0f
-		&& b[1] == 1.0f
-		&& b[2] == 1.0f
-		&& (
-			b_dev[0] != 0.0f
-			||b_dev[4] != 0.0f
-			||b_dev[8] != 0.0f
-		)
-	){
+	if(b[0] == 1.0f && b[1] == 1.0f && b[2] == 1.0f && (b_dev[0] != 0.0f || b_dev[4] != 0.0f || b_dev[8] != 0.0f)) {
+		//NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) Cuda has no other way to print; Numbers are array indices to be printed
 		printf("matrix_deviatoric_3d failed to get things write (probably compiler issue)");
 	}
 
 	///< |f| = P * F^T * Volume
 	float dev_b_coeff = mu * powf(J, -2.f / 3.f);
 	float i_coeff	  = data.bm * .5f * ((J * J - 1.f) * 0.5f - logf(J));
-	PF[0]		  = (dev_b_coeff * b_dev[0] + i_coeff) * volume;
-	PF[1]		  = (dev_b_coeff * b_dev[1]) * volume;
-	PF[2]		  = (dev_b_coeff * b_dev[2]) * volume;
-	PF[3]		  = (dev_b_coeff * b_dev[3]) * volume;
-	PF[4]		  = (dev_b_coeff * b_dev[4] + i_coeff) * volume;
-	PF[5]		  = (dev_b_coeff * b_dev[5]) * volume;
-	PF[6]		  = (dev_b_coeff * b_dev[6]) * volume;
-	PF[7]		  = (dev_b_coeff * b_dev[7]) * volume;
-	PF[8]		  = (dev_b_coeff * b_dev[8] + i_coeff) * volume;
-	
+	PF[0]			  = (dev_b_coeff * b_dev[0] + i_coeff) * volume;
+	PF[1]			  = (dev_b_coeff * b_dev[1]) * volume;
+	PF[2]			  = (dev_b_coeff * b_dev[2]) * volume;
+	PF[3]			  = (dev_b_coeff * b_dev[3]) * volume;
+	PF[4]			  = (dev_b_coeff * b_dev[4] + i_coeff) * volume;
+	PF[5]			  = (dev_b_coeff * b_dev[5]) * volume;
+	PF[6]			  = (dev_b_coeff * b_dev[6]) * volume;
+	PF[7]			  = (dev_b_coeff * b_dev[7]) * volume;
+	PF[8]			  = (dev_b_coeff * b_dev[8] + i_coeff) * volume;
+
 	if(
 		//blockIdx.x == 0 && threadIdx.x == 0
 		isnan(PF[0])
@@ -254,9 +250,9 @@ __forceinline__ __device__ void compute_stress<float, MaterialE::SAND>(const flo
 
 #pragma unroll 3
 	for(int i = 0; i < 3; i++) {
-		float abs_S	   = S[i] > 0 ? S[i] : -S[i];
-		abs_S	   = abs_S > static_cast<float>(1e-4) ? abs_S : static_cast<float>(1e-4);
-		epsilon[i] = logf(abs_S) - data.cohesion;
+		float abs_S = S[i] > 0 ? S[i] : -S[i];
+		abs_S		= abs_S > static_cast<float>(1e-4) ? abs_S : static_cast<float>(1e-4);
+		epsilon[i]	= logf(abs_S) - data.cohesion;
 	}
 	float sum_epsilon	= epsilon[0] + epsilon[1] + epsilon[2];
 	float trace_epsilon = sum_epsilon + data.log_jp;
@@ -318,7 +314,7 @@ __forceinline__ __device__ void compute_stress<float, MaterialE::SAND>(const flo
 	// float S_inverse[3] = {1.f / New_S[0], 1.f / New_S[1], 1.f / New_S[2]}; // TO
 	// CHECK
 	float trace_log_S = New_S_log[0] + New_S_log[1] + New_S_log[2];
-	
+
 #pragma unroll 3
 	for(int i = 0; i < 3; i++) {
 		P_hat[i] = (scaled_mu * New_S_log[i] + lambda * trace_log_S) / New_S[i];

@@ -34,7 +34,7 @@ struct HaloPartition<1> {
 	template<typename Allocator>
 	HaloPartition(Allocator allocator, int max_block_count)
 		: h_count(0) {
-		halo_count		  = static_cast<int*>(allocator.allocate(sizeof(char) * max_block_count));
+		halo_count	  = static_cast<int*>(allocator.allocate(sizeof(char) * max_block_count));
 		halo_marks	  = static_cast<char*>(allocator.allocate(sizeof(char) * max_block_count));
 		overlap_marks = static_cast<int*>(allocator.allocate(sizeof(int) * max_block_count));
 		halo_blocks	  = static_cast<ivec3*>(allocator.allocate(sizeof(ivec3) * max_block_count));
@@ -95,11 +95,11 @@ struct Partition
 	Partition(Allocator allocator, int max_block_count)
 		: halo_base_t {allocator, max_block_count} {
 		allocate_table(allocator, max_block_count);
-		cell_particle_counts		 = static_cast<int*>(allocator.allocate(sizeof(int) * max_block_count * config::G_BLOCKVOLUME));
-		particle_bucket_sizes		 = static_cast<int*>(allocator.allocate(sizeof(int) * max_block_count));
-		cellbuckets	 = static_cast<int*>(allocator.allocate(sizeof(int) * max_block_count * config::G_BLOCKVOLUME * config::G_MAX_PARTICLES_IN_CELL));
-		blockbuckets = static_cast<int*>(allocator.allocate(sizeof(int) * max_block_count * config::G_PARTICLE_NUM_PER_BLOCK));
-		bin_offsets		 = static_cast<int*>(allocator.allocate(sizeof(int) * max_block_count));
+		cell_particle_counts  = static_cast<int*>(allocator.allocate(sizeof(int) * max_block_count * config::G_BLOCKVOLUME));
+		particle_bucket_sizes = static_cast<int*>(allocator.allocate(sizeof(int) * max_block_count));
+		cellbuckets			  = static_cast<int*>(allocator.allocate(sizeof(int) * max_block_count * config::G_BLOCKVOLUME * config::G_MAX_PARTICLES_IN_CELL));
+		blockbuckets		  = static_cast<int*>(allocator.allocate(sizeof(int) * max_block_count * config::G_PARTICLE_NUM_PER_BLOCK));
+		bin_offsets			  = static_cast<int*>(allocator.allocate(sizeof(int) * max_block_count));
 
 		/// init
 		reset();
@@ -122,11 +122,11 @@ struct Partition
 		allocator.deallocate(blockbuckets, sizeof(int) * this->capacity * config::G_BLOCKVOLUME);
 		allocator.deallocate(bin_offsets, sizeof(int) * this->capacity);
 
-		cell_particle_counts		 = static_cast<int*>(allocator.allocate(sizeof(int) * capacity * config::G_BLOCKVOLUME));
-		particle_bucket_sizes		 = static_cast<int*>(allocator.allocate(sizeof(int) * capacity));
-		cellbuckets	 = static_cast<int*>(allocator.allocate(sizeof(int) * capacity * config::G_BLOCKVOLUME * config::G_MAX_PARTICLES_IN_CELL));
-		blockbuckets = static_cast<int*>(allocator.allocate(sizeof(int) * capacity * config::G_PARTICLE_NUM_PER_BLOCK));
-		bin_offsets		 = static_cast<int*>(allocator.allocate(sizeof(int) * capacity));
+		cell_particle_counts  = static_cast<int*>(allocator.allocate(sizeof(int) * capacity * config::G_BLOCKVOLUME));
+		particle_bucket_sizes = static_cast<int*>(allocator.allocate(sizeof(int) * capacity));
+		cellbuckets			  = static_cast<int*>(allocator.allocate(sizeof(int) * capacity * config::G_BLOCKVOLUME * config::G_MAX_PARTICLES_IN_CELL));
+		blockbuckets		  = static_cast<int*>(allocator.allocate(sizeof(int) * capacity * config::G_PARTICLE_NUM_PER_BLOCK));
+		bin_offsets			  = static_cast<int*>(allocator.allocate(sizeof(int) * capacity));
 
 		resize_table(allocator, capacity);
 	}
@@ -179,8 +179,8 @@ struct Partition
 		}
 #endif
 		//NOLINTNEXTLINE(readability-magic-numbers) Numbers are array indices to be printed
-		value_t cellno																				 = ((cellid[0] & config::G_BLOCKMASK) << (config::G_BLOCKBITS << 1)) | ((cellid[1] & config::G_BLOCKMASK) << config::G_BLOCKBITS) | (cellid[2] & config::G_BLOCKMASK);
-		int particle_id_in_cell																					 = atomicAdd(cell_particle_counts + static_cast<ptrdiff_t>(blockno) * config::G_BLOCKVOLUME + cellno, 1);
+		value_t cellno																											 = ((cellid[0] & config::G_BLOCKMASK) << (config::G_BLOCKBITS << 1)) | ((cellid[1] & config::G_BLOCKMASK) << config::G_BLOCKBITS) | (cellid[2] & config::G_BLOCKMASK);
+		int particle_id_in_cell																									 = atomicAdd(cell_particle_counts + static_cast<ptrdiff_t>(blockno) * config::G_BLOCKVOLUME + cellno, 1);
 		cellbuckets[blockno * config::G_PARTICLE_NUM_PER_BLOCK + cellno * config::G_MAX_PARTICLES_IN_CELL + particle_id_in_cell] = (dirtag * config::G_PARTICLE_NUM_PER_BLOCK) | particle_id_in_block;
 	}
 };

@@ -5,6 +5,7 @@
 
 #include <array>
 
+//NOLINTNEXTLINE(cppcoreguidelines-macro-usage) Macro usage necessary here for preprocessor if
 #define PRINT_CELL_OVERFLOW 0//TODO: Move to another place
 
 namespace mn {
@@ -38,8 +39,8 @@ namespace config {
 	}
 	constexpr int G_TOTAL_FRAME_CNT = 60;
 	constexpr int NUM_DIMENSIONS	= 3;
-	
-	constexpr int CUDA_WARP_SIZE		   = 32;
+
+	constexpr int CUDA_WARP_SIZE = 32;
 
 	constexpr int GBPCB							   = 16;
 	constexpr int G_NUM_GRID_BLOCKS_PER_CUDA_BLOCK = GBPCB;
@@ -53,26 +54,26 @@ namespace config {
 
 	// background_grid
 	constexpr float GRID_BLOCK_SPACING = 1.0f;
-	
-	constexpr int BLOCK_BITS	= 2;
-	constexpr int DOMAIN_BITS	= 8;
-	constexpr float DXINV		= (GRID_BLOCK_SPACING * (1 << DOMAIN_BITS));
-	constexpr int G_DOMAIN_BITS = DOMAIN_BITS;
-	constexpr int G_DOMAIN_SIZE = (1 << DOMAIN_BITS);
-	constexpr float G_BOUNDARY_CONDITION		= 2.0;
-	constexpr float G_DX		= 1.f / DXINV;
-	constexpr float G_DX_INV	= DXINV;
-	constexpr float G_D_INV		= 4.f * DXINV * DXINV;
-	constexpr int G_BLOCKBITS	= BLOCK_BITS;
-	constexpr int G_BLOCKSIZE	= (1 << BLOCK_BITS);
-	constexpr int G_BLOCKMASK	= ((1 << BLOCK_BITS) - 1);
-	constexpr int G_BLOCKVOLUME = (1 << (BLOCK_BITS * 3));
-	constexpr int G_GRID_BITS	= (DOMAIN_BITS - BLOCK_BITS);
-	constexpr int G_GRID_SIZE	= (1 << (DOMAIN_BITS - BLOCK_BITS));
+
+	constexpr int BLOCK_BITS			 = 2;
+	constexpr int DOMAIN_BITS			 = 8;
+	constexpr float DXINV				 = (GRID_BLOCK_SPACING * (1 << DOMAIN_BITS));
+	constexpr int G_DOMAIN_BITS			 = DOMAIN_BITS;
+	constexpr int G_DOMAIN_SIZE			 = (1 << DOMAIN_BITS);
+	constexpr float G_BOUNDARY_CONDITION = 2.0;
+	constexpr float G_DX				 = 1.f / DXINV;
+	constexpr float G_DX_INV			 = DXINV;
+	constexpr float G_D_INV				 = 4.f * DXINV * DXINV;
+	constexpr int G_BLOCKBITS			 = BLOCK_BITS;
+	constexpr int G_BLOCKSIZE			 = (1 << BLOCK_BITS);
+	constexpr int G_BLOCKMASK			 = ((1 << BLOCK_BITS) - 1);
+	constexpr int G_BLOCKVOLUME			 = (1 << (BLOCK_BITS * 3));
+	constexpr int G_GRID_BITS			 = (DOMAIN_BITS - BLOCK_BITS);
+	constexpr int G_GRID_SIZE			 = (1 << (DOMAIN_BITS - BLOCK_BITS));
 
 	// particle
-	constexpr int MAX_PARTICLES_IN_CELL				   = 128;
-	constexpr int G_MAX_PARTICLES_IN_CELL				   = MAX_PARTICLES_IN_CELL;
+	constexpr int MAX_PARTICLES_IN_CELL	   = 128;
+	constexpr int G_MAX_PARTICLES_IN_CELL  = MAX_PARTICLES_IN_CELL;
 	constexpr int G_BIN_CAPACITY		   = 32;
 	constexpr int G_PARTICLE_NUM_PER_BLOCK = (MAX_PARTICLES_IN_CELL * (1 << (BLOCK_BITS * 3)));
 

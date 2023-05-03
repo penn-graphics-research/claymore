@@ -200,9 +200,9 @@ struct Structural<StructuralType::HASH, Decoration, Domain, Layout, Structurals.
 	// func members
 	template<typename Allocator>
 	void allocate_table(Allocator allocator, value_t capacity) {
-		this->capacity	= capacity;
-		count			= static_cast<value_t*>(allocator.allocate(sizeof(value_t)));
-		active_keys = static_cast<key_t*>(allocator.allocate(sizeof(key_t) * capacity));
+		this->capacity = capacity;
+		count		   = static_cast<value_t*>(allocator.allocate(sizeof(value_t)));
+		active_keys	   = static_cast<key_t*>(allocator.allocate(sizeof(key_t) * capacity));
 		/// lookup table
 		index_table = static_cast<value_t*>(allocator.allocate(sizeof(value_t) * Domain::extent));
 	}
@@ -210,8 +210,8 @@ struct Structural<StructuralType::HASH, Decoration, Domain, Layout, Structurals.
 	template<typename Allocator>
 	void resize_table(Allocator allocator, std::size_t capacity) {
 		allocator.deallocate(active_keys, this->capacity);
-		active_keys = static_cast<key_t*>(allocator.allocate(sizeof(key_t) * capacity));
-		this->capacity	= capacity;
+		active_keys	   = static_cast<key_t*>(allocator.allocate(sizeof(key_t) * capacity));
+		this->capacity = capacity;
 	}
 
 	template<typename Allocator>
@@ -221,7 +221,7 @@ struct Structural<StructuralType::HASH, Decoration, Domain, Layout, Structurals.
 		allocator.deallocate(index_table, sizeof(value_t) * Domain::extent);
 		base_t::deallocate(allocator);
 		capacity	= 0;
-		count			= nullptr;
+		count		= nullptr;
 		active_keys = nullptr;
 		index_table = nullptr;
 	}
@@ -283,14 +283,14 @@ struct Structural<StructuralType::DYNAMIC, Decoration, Domain, Layout, Structura
 	template<typename Allocator>
 	void resize(Allocator allocator, std::size_t capacity) {
 		allocator.deallocate(this->handle.ptr, this->capacity);
-		this->capacity		 = capacity;///< each time multiply by 2
+		this->capacity	 = capacity;///< each time multiply by 2
 		this->handle.ptr = allocator.allocate(capacity * base_t::element_storage_size);
 	}
 
 	template<typename Allocator>
 	void deallocate(Allocator allocator) {
 		allocator.deallocate(this->handle.ptr, this->capacity * base_t::element_storage_size);
-		this->capacity		 = 0;
+		this->capacity	 = 0;
 		this->handle.ptr = nullptr;
 	}
 };

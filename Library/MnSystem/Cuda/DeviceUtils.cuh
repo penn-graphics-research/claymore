@@ -182,13 +182,13 @@ template<typename T>
 __forceinline__ __device__ T atomic_agg_inc(T* p) {
 	//Create group for all threads in this warp
 	cg::coalesced_group g = cg::coalesced_threads();
-	
+
 	//First thread increases size
 	T prev;
 	if(g.thread_rank() == 0) {
 		prev = atomicAdd(p, g.size());
 	}
-	
+
 	//All threads fetch the value from the first thread and add their rank as offset
 	prev = g.thread_rank() + g.shfl(prev, 0);
 	return prev;

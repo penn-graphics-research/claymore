@@ -64,7 +64,7 @@ struct ParticleBufferImpl : Instance<particle_buffer_<particle_bin_<Mt>>> {
 
 	template<typename Allocator>
 	void check_capacity(Allocator allocator, std::size_t capacity) {
-		if(capacity > this->capacity){
+		if(capacity > this->capacity) {
 			this->resize(allocator, capacity);
 		}
 	}
@@ -78,11 +78,11 @@ struct ParticleBufferImpl : Instance<particle_buffer_<particle_bin_<Mt>>> {
 			allocator.deallocate(blockbuckets, sizeof(int) * num_active_blocks * config::G_PARTICLE_NUM_PER_BLOCK);
 			allocator.deallocate(bin_offsets, sizeof(int) * num_active_blocks);
 		}
-		num_active_blocks = num_block_count;
-		cell_particle_counts			  = static_cast<int*>(allocator.allocate(sizeof(int) * num_active_blocks * config::G_BLOCKVOLUME));
-		particle_bucket_sizes			  = static_cast<int*>(allocator.allocate(sizeof(int) * num_active_blocks));
-		cellbuckets		  = static_cast<int*>(allocator.allocate(sizeof(int) * num_active_blocks * config::G_BLOCKVOLUME * config::G_MAX_PARTICLES_IN_CELL));
-		blockbuckets	  = static_cast<int*>(allocator.allocate(sizeof(int) * num_active_blocks * config::G_PARTICLE_NUM_PER_BLOCK));
+		num_active_blocks	  = num_block_count;
+		cell_particle_counts  = static_cast<int*>(allocator.allocate(sizeof(int) * num_active_blocks * config::G_BLOCKVOLUME));
+		particle_bucket_sizes = static_cast<int*>(allocator.allocate(sizeof(int) * num_active_blocks));
+		cellbuckets			  = static_cast<int*>(allocator.allocate(sizeof(int) * num_active_blocks * config::G_BLOCKVOLUME * config::G_MAX_PARTICLES_IN_CELL));
+		blockbuckets		  = static_cast<int*>(allocator.allocate(sizeof(int) * num_active_blocks * config::G_PARTICLE_NUM_PER_BLOCK));
 		bin_offsets			  = static_cast<int*>(allocator.allocate(sizeof(int) * num_active_blocks));
 		reset_ppcs();
 	}
@@ -99,17 +99,16 @@ struct ParticleBufferImpl : Instance<particle_buffer_<particle_bin_<Mt>>> {
 	//FIXME: passing kjey_t here might cause problems because cuda is buggy
 	__forceinline__ __device__ void add_advection(Partition<1>& table, Partition<1>::key_t cellid, int dirtag, int particle_id_in_block) noexcept {
 		const Partition<1>::key_t blockid = cellid / static_cast<int>(config::G_BLOCKSIZE);
-		const int blockno					= table.query(blockid);
-		
+		const int blockno				  = table.query(blockid);
 
 		//If block does not yet exist, print message and return (particle will be lost).
 		if(blockno == -1) {
-			#if PRINT_NEGATIVE_BLOGNOS
-			std::array<int, 3> offset {};
+#if PRINT_NEGATIVE_BLOGNOS
+			std::array<int, config::NUM_DIMENSIONS> offset {};
 			dir_components(dirtag, offset);
 			//NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg, readability-magic-numbers) Cuda has no other way to print; Numbers are array indices to be printed
 			printf("loc(%d, %d, %d) dir(%d, %d, %d) particle_id_in_block(%d)\n", cellid[0], cellid[1], cellid[2], offset[0], offset[1], offset[2], particle_id_in_block);
-			#endif
+#endif
 			return;
 		}
 		//Store the particle id and its offset in the dst cell bucket
@@ -118,17 +117,19 @@ struct ParticleBufferImpl : Instance<particle_buffer_<particle_bin_<Mt>>> {
 		const int cellno = ((cellid[0] & config::G_BLOCKMASK) << (config::G_BLOCKBITS << 1)) | ((cellid[1] & config::G_BLOCKMASK) << config::G_BLOCKBITS) | (cellid[2] & config::G_BLOCKMASK);
 		//NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) Cuda does not yet support std::span
 		const int particle_id_in_cell = atomicAdd(cell_particle_counts + static_cast<ptrdiff_t>(blockno) * config::G_BLOCKVOLUME + cellno, 1);
-		
+
 		//If no space is left, don't store the particle
-		if(particle_id_in_cell >= config::G_MAX_PARTICLES_IN_CELL){
+		if(particle_id_in_cell >= config::G_MAX_PARTICLES_IN_CELL) {
 			//Reduce count again
+			//NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) Cuda does not yet support std::span
 			atomicSub(cell_particle_counts + static_cast<ptrdiff_t>(blockno) * config::G_BLOCKVOLUME + cellno, 1);
-			#if PRINT_CELL_OVERFLOW
+#if PRINT_CELL_OVERFLOW
+			//NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg, readability-magic-numbers) Cuda has no other way to print; Numbers are array indices to be printed
 			printf("No space left in cell: block(%d), cell(%d)\n", blockno, cellno);
-			#endif
+#endif
 			return;
 		}
-		
+
 		//NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) Cuda does not yet support std::span
 		cellbuckets[blockno * config::G_PARTICLE_NUM_PER_BLOCK + cellno * config::G_MAX_PARTICLES_IN_CELL + particle_id_in_cell] = (dirtag * config::G_PARTICLE_NUM_PER_BLOCK) | particle_id_in_block;
 	}
@@ -144,20 +145,20 @@ struct ParticleBuffer<MaterialE::J_FLUID> : ParticleBufferImpl<MaterialE::J_FLUI
 	using base_t = ParticleBufferImpl<MaterialE::J_FLUID>;
 
 	//NOLINTBEGIN(readability-magic-numbers) Parameter definitions
-	float rho	 = config::DENSITY;
-	float volume = (1.0f / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / config::MODEL_PPC);
-	float mass	 = (config::DENSITY / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / config::MODEL_PPC);
-	float bulk	 = 4e4;
-	float gamma	 = 7.15f;//Penalize large deviations from incompressibility
-	float viscosity	 = 0.01f;
+	float rho		= config::DENSITY;
+	float volume	= (1.0f / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / config::MODEL_PPC);
+	float mass		= (config::DENSITY / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / config::MODEL_PPC);
+	float bulk		= 4e4;
+	float gamma		= 7.15f;//Penalize large deviations from incompressibility
+	float viscosity = 0.01f;
 
 	void update_parameters(float density, float vol, float b, float g, float v) {
-		rho	   = density;
-		volume = vol;
-		mass   = volume * density;
-		bulk   = b;
-		gamma  = g;
-		viscosity  = v;
+		rho		  = density;
+		volume	  = vol;
+		mass	  = volume * density;
+		bulk	  = b;
+		gamma	  = g;
+		viscosity = v;
 	}
 	//NOLINTEND(readability-magic-numbers)
 

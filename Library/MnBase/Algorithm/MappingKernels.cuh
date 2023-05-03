@@ -47,7 +47,7 @@ __global__ void exclusive_scan_inverse(CounterType num, const IndexType* map, In
 	if(idx >= num) {
 		return;
 	}
-	
+
 	const auto map_idx = map[idx];
 	if(map_idx != map[idx + 1]) {
 		map_inv[map_idx] = idx;

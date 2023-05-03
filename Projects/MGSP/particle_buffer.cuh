@@ -74,20 +74,20 @@ struct ParticleBuffer<MaterialE::J_FLUID> : ParticleBufferImpl<MaterialE::J_FLUI
 	using base_t = ParticleBufferImpl<MaterialE::J_FLUID>;
 
 	//NOLINTBEGIN(readability-magic-numbers) Parameter definitions
-	float rho	 = config::DENSITY;
-	float volume = (1.0f / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / config::MODEL_PPC);
-	float mass	 = (config::DENSITY / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / config::MODEL_PPC);
-	float bulk	 = 4e4;
-	float gamma	 = 7.15f;
-	float viscosity	 = 0.01f;
+	float rho		= config::DENSITY;
+	float volume	= (1.0f / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / config::MODEL_PPC);
+	float mass		= (config::DENSITY / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / (1u << config::DOMAIN_BITS) / config::MODEL_PPC);
+	float bulk		= 4e4;
+	float gamma		= 7.15f;
+	float viscosity = 0.01f;
 
 	void update_parameters(float density, float vol, float b, float g, float v) {
-		rho	   = density;
-		volume = vol;
-		mass   = volume * density;
-		bulk   = b;
-		gamma  = g;
-		viscosity  = v;
+		rho		  = density;
+		volume	  = vol;
+		mass	  = volume * density;
+		bulk	  = b;
+		gamma	  = g;
+		viscosity = v;
 	}
 	//NOLINTEND(readability-magic-numbers)
 

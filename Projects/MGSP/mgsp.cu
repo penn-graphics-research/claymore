@@ -48,8 +48,8 @@ void init_models(std::array<std::vector<std::array<float, mn::config::NUM_DIMENS
 			}
 			break;
 		case 2: {
-			constexpr auto LEN		 = 54;
-			constexpr auto STRIDE	 = 56;
+			constexpr auto LEN		   = 54;
+			constexpr auto STRIDE	   = 56;
 			constexpr auto MODEL_COUNT = 1;
 			for(int did = 0; did < mn::config::G_DEVICE_COUNT; ++did) {
 				models[did].clear();
@@ -62,8 +62,8 @@ void init_models(std::array<std::vector<std::array<float, mn::config::NUM_DIMENS
 			}
 		} break;
 		case 3: {
-			constexpr auto LEN		 = 72;// 54;
-			constexpr auto STRIDE	 = (mn::config::G_DOMAIN_SIZE / 2);
+			constexpr auto LEN		   = 72;// 54;
+			constexpr auto STRIDE	   = (mn::config::G_DOMAIN_SIZE / 2);
 			constexpr auto MODEL_COUNT = 1;
 			for(int did = 0; did < mn::config::G_DEVICE_COUNT; ++did) {
 				models[did].clear();

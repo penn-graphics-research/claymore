@@ -145,8 +145,8 @@ void parse_scene(const std::string& fn, std::unique_ptr<mn::GmpmSimulator>& benc
 						}
 
 						for(int d = 0; d < mn::config::NUM_DIMENSIONS; ++d) {
-							offset[d] = model["offset"].GetArray()[d].GetFloat();
-							span[d] = model["span"].GetArray()[d].GetFloat();
+							offset[d]	= model["offset"].GetArray()[d].GetFloat();
+							span[d]		= model["span"].GetArray()[d].GetFloat();
 							velocity[d] = model["velocity"].GetArray()[d].GetFloat();
 						}
 						if(p.extension() == ".sdf") {

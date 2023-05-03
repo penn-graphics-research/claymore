@@ -31,7 +31,7 @@ struct HaloPartition<1> {
 	template<typename Allocator>
 	HaloPartition(Allocator allocator, int max_block_count)
 		: h_count(0) {
-		halo_count		  = static_cast<int*>(allocator.allocate(sizeof(char) * max_block_count));
+		halo_count	  = static_cast<int*>(allocator.allocate(sizeof(char) * max_block_count));
 		halo_marks	  = static_cast<char*>(allocator.allocate(sizeof(char) * max_block_count));
 		overlap_marks = static_cast<int*>(allocator.allocate(sizeof(int) * max_block_count));
 		halo_blocks	  = static_cast<ivec3*>(allocator.allocate(sizeof(ivec3) * max_block_count));

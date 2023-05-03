@@ -1,9 +1,9 @@
 #ifndef MN_VEC_H
 #define MN_VEC_H
+#include <array>
 #include <functional>
 #include <type_traits>
 #include <utility>
-#include <array>
 
 #include "MnBase/Meta/MathMeta.h"
 #include "MnBase/Meta/Meta.h"

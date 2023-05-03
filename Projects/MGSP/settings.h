@@ -35,7 +35,7 @@ namespace config {
 		return MaterialE::J_FLUID;
 	}
 	constexpr int G_TOTAL_FRAME_COUNT = 60;
-	constexpr int NUM_DIMENSIONS	= 3;
+	constexpr int NUM_DIMENSIONS	  = 3;
 
 	constexpr int GBPCB							   = 16;
 	constexpr int G_NUM_GRID_BLOCKS_PER_CUDA_BLOCK = GBPCB;
@@ -48,21 +48,21 @@ namespace config {
 	constexpr float CFL			= 0.5f;
 
 	// background_grid
-	constexpr int BLOCK_BITS	= 2;
-	constexpr int DOMAIN_BITS	= 8;
-	constexpr float DXINV		= (1.0f * (1u << DOMAIN_BITS));
-	constexpr int G_DOMAIN_BITS = DOMAIN_BITS;
-	constexpr int G_DOMAIN_SIZE = (1 << DOMAIN_BITS);
-	constexpr float G_BOUNDARY_CONDITION		= 2.0;
-	constexpr float G_DX		= 1.f / DXINV;
-	constexpr float G_DX_INV	= DXINV;
-	constexpr float G_D_INV		= 4.f * DXINV * DXINV;
-	constexpr int G_BLOCKBITS	= BLOCK_BITS;
-	constexpr int G_BLOCKSIZE	= (1 << BLOCK_BITS);
-	constexpr int G_BLOCKMASK	= ((1 << BLOCK_BITS) - 1);
-	constexpr int G_BLOCKVOLUME = (1 << (BLOCK_BITS * 3));
-	constexpr int G_GRID_BITS	= (DOMAIN_BITS - BLOCK_BITS);
-	constexpr int G_GRID_SIZE	= (1 << (DOMAIN_BITS - BLOCK_BITS));
+	constexpr int BLOCK_BITS			 = 2;
+	constexpr int DOMAIN_BITS			 = 8;
+	constexpr float DXINV				 = (1.0f * (1u << DOMAIN_BITS));
+	constexpr int G_DOMAIN_BITS			 = DOMAIN_BITS;
+	constexpr int G_DOMAIN_SIZE			 = (1 << DOMAIN_BITS);
+	constexpr float G_BOUNDARY_CONDITION = 2.0;
+	constexpr float G_DX				 = 1.f / DXINV;
+	constexpr float G_DX_INV			 = DXINV;
+	constexpr float G_D_INV				 = 4.f * DXINV * DXINV;
+	constexpr int G_BLOCKBITS			 = BLOCK_BITS;
+	constexpr int G_BLOCKSIZE			 = (1 << BLOCK_BITS);
+	constexpr int G_BLOCKMASK			 = ((1 << BLOCK_BITS) - 1);
+	constexpr int G_BLOCKVOLUME			 = (1 << (BLOCK_BITS * 3));
+	constexpr int G_GRID_BITS			 = (DOMAIN_BITS - BLOCK_BITS);
+	constexpr int G_GRID_SIZE			 = (1 << (DOMAIN_BITS - BLOCK_BITS));
 
 	// partition domains
 	//NOLINTBEGIN(readability-magic-numbers) Numbers are used for dividing domains
@@ -94,8 +94,8 @@ namespace config {
 	//NOLINTEND(readability-magic-numbers)
 
 	// particle
-	constexpr int MAX_PARTICLES_IN_CELL				   = 128;
-	constexpr int G_MAX_PARTICLES_IN_CELL				   = MAX_PARTICLES_IN_CELL;
+	constexpr int MAX_PARTICLES_IN_CELL	   = 128;
+	constexpr int G_MAX_PARTICLES_IN_CELL  = MAX_PARTICLES_IN_CELL;
 	constexpr int G_BIN_CAPACITY		   = 32;
 	constexpr int G_PARTICLE_NUM_PER_BLOCK = (MAX_PARTICLES_IN_CELL * (1 << (BLOCK_BITS * 3)));
 
