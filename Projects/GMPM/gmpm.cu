@@ -169,7 +169,7 @@ int main(int argc, char* argv[]) {
 	mn::Cuda::startup();
 
 	cxxopts::Options options("Scene_Loader", "Read simulation scene");
-	options.add_options()("f,file", "Scene Configuration File", cxxopts::value<std::string>()->default_value("scene.json"));
+	options.add_options()("f,file", "Scene Configuration File", cxxopts::value<std::string>()->default_value("scenes/scene.json"));
 	auto results = options.parse(argc, argv);
 	auto fn		 = results["file"].as<std::string>();
 	fmt::print("loading scene [{}]\n", fn);
