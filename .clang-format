@@ -1,0 +1,110 @@
+Language: Cpp                                       # Maybe change
+Standard: Auto                                      # Maybe change
+BasedOnStyle: Google                                # Maybe change
+AlignAfterOpenBracket: BlockIndent                  # Better overview
+AlignArrayOfStructures: Right                       # Better overview (but might make editing harder)
+AlignConsecutiveAssignments: true                   # Better overview (but might make editing harder)
+AlignConsecutiveBitFields: true                     # Better overview (but might make editing harder)
+AlignConsecutiveDeclarations: false                 # Better Overview, as otherwise we would separate a identifier from its type
+AlignEscapedNewlines: Left                          # Better Overview
+AlignOperands: AlignAfterOperator                   # Better overview
+AlignTrailingComments:
+    Kind: Always                                    # Better overview
+AllowAllArgumentsOnNextLine: false                  # Better overview
+AllowAllParametersOfDeclarationOnNextLine: false    # Better overview
+AllowShortBlocksOnASingleLine: Empty                # Better overview
+AllowShortCaseLabelsOnASingleLine: false            # Better overview
+AllowShortEnumsOnASingleLine: false                 # Better overview
+AllowShortFunctionsOnASingleLine: Empty             # Better overview
+AllowShortIfStatementsOnASingleLine: Never          # Better overview
+AllowShortLambdasOnASingleLine: Empty               # Better overview
+AllowShortLoopsOnASingleLine: false                 # Better overview
+AlwaysBreakAfterReturnType: None                    # Don't produce an unnecessary empty line
+AlwaysBreakBeforeMultilineStrings: true             # Better overview
+AlwaysBreakTemplateDeclarations: Yes                # Better overview
+BinPackArguments: false                             # Better overview
+BinPackParameters: false                            # Better overview
+BitFieldColonSpacing: Both                          # Better overview
+BraceWrapping:
+    AfterCaseLabel: false                           # Don't produce an unnecessary empty line
+    AfterClass: false                               # Don't produce an unnecessary empty line
+    AfterControlStatement: Never                    # Don't produce an unnecessary empty line
+    AfterEnum: false                                # Don't produce an unnecessary empty line
+    AfterFunction: false                            # Don't produce an unnecessary empty line
+    AfterNamespace: false                           # Don't produce an unnecessary empty line
+    AfterObjCDeclaration: false                     # Don't produce an unnecessary empty line
+    AfterStruct: false                              # Don't produce an unnecessary empty line
+    AfterUnion: false                               # Don't produce an unnecessary empty line
+    AfterExternBlock: false                         # Don't produce an unnecessary empty line
+    BeforeCatch: false                              # Don't produce an unnecessary empty line
+    BeforeElse: false                               # Don't produce an unnecessary empty line
+    BeforeLambdaBody: false                         # Don't produce an unnecessary empty line
+    BeforeWhile: false                              # Don't produce an unnecessary empty line
+    IndentBraces: false                             # Don't produce an unnecessary empty line
+    SplitEmptyFunction: false                       # Don't produce an unnecessary empty line
+    SplitEmptyRecord: false                         # Don't produce an unnecessary empty line
+    SplitEmptyNamespace: false                      # Don't produce an unnecessary empty line
+BreakAfterAttributes: Never                         # Don't produce an unnecessary empty line
+BreakBeforeBinaryOperators: NonAssignment           # Allows easier out-commenting of single parts of assignments
+BreakBeforeBraces: Attach                           # Don't produce an unnecessary empty line
+BreakBeforeConceptDeclarations: true                # Better overview
+BreakBeforeTernaryOperators: true                   # Better overview
+BreakConstructorInitializers: BeforeComma           # Better overview and easier out-commenting of single initializers
+BreakInheritanceList: BeforeComma                   # Better overview and easier out-commenting of base classes
+BreakStringLiterals: false                          # Avoid config-based wrapping of strings (as it actually depends on the users screen size how wrapping should be applied)
+ColumnLimit: 1000                                   # No limit (use high number to enforce removal of existing breaks); Avoid config-based wrapping of strings (as it actually depends on the users screen size how wrapping should be applied)
+CompactNamespaces: false                            # Better overview
+Cpp11BracedListStyle: true                          # Better overview
+DeriveLineEnding: false                             # Formatting should be fixed, not derived
+DerivePointerAlignment: false                       # Formatting should be fixed, not derived
+EmptyLineAfterAccessModifier: Never                 # Don't produce an unnecessary empty line
+EmptyLineBeforeAccessModifier: Always               # Here empty lines help overview, as they clearly make the current access modifier more visible
+FixNamespaceComments: true                          # Better overview
+IncludeBlocks: Regroup                              # Better overview
+IndentAccessModifiers: false                        # As members will be intended, this separates access modifiers from members more clearly
+IndentCaseBlocks: false                             # We don't wrap braces here, so intend would move closing brace out of vertical line
+IndentCaseLabels: true                              # Better overview, as it's visible, that case is inside switch
+IndentExternBlock: Indent                           # Better overview
+IndentGotoLabels: true                              # Better overview, as otherwise e.gt breaks would break out intendation
+IndentPPDirectives: AfterHash                       # Better overview, as hash tag still marks post processing, but the directives are intended
+IndentRequiresClause: false                         #Intend would break statement out of vertical line
+IndentWidth: 4                                      # Make tab indentation work
+IndentWrappedFunctionNames: true                    # Better overview, as the breaking of function name is marked
+InsertBraces: false                                 # Done by clang-tidy #Better overview and maintaining of code, as additional statements can be easily added. WARNING: May break code. Better directly avoid clauses without braces
+KeepEmptyLinesAtTheStartOfBlocks: false             # Remove an unnecessary empty line
+LambdaBodyIndentation: Signature                    # Better overview
+NamespaceIndentation: Inner                         # Avoid having most of the code intended if we have a big namespace
+PackConstructorInitializers: Never                  # Better overview
+PointerAlignment: Left                              # Better overview, as star is part of the type
+QualifierAlignment: Leave                           # clang-format is not able to handle this without breaking code
+ReferenceAlignment: Left                            # Better overview, as ampersand is part of the type
+ReflowComments: false                               # I don't know, what clang-format is doing here, but it looks bad: Avoid config-based wrapping of strings (as it actually depends on the users screen size how wrapping should be applied)
+RequiresClausePosition: OwnLine                     # Better overview
+RequiresExpressionIndentation: OuterScope           # Better overview
+SeparateDefinitionBlocks: Leave                     # Allow user to specify that on his own. May be used to group some blocks together that belong together, while separating other blocks
+ShortNamespaceLines: 0                              # Better overview, as namespaces are clearly marked by closing comment and opening statement
+SortIncludes: CaseSensitive                         # Better overview. TODO: Maybe change that if it causes problems
+SortUsingDeclarations: true                         # Better overview. TODO: Maybe change that if it causes problems
+SpaceAfterCStyleCast: true                          # Better overview
+SpaceAfterLogicalNot: false                         # Avoid unnecessary space, cause actually the unary operator belongs to the identifier
+SpaceAfterTemplateKeyword: false                    # Space would separate template from it's parameters
+SpaceAroundPointerQualifiers: Default               # Don't known why we should change this. TODO: Reevaluate?
+SpaceBeforeAssignmentOperators: true                # Better overview, as we separate identifier from operator
+SpaceBeforeCaseColon: false                         # Avoid unnecessary space
+SpaceBeforeCpp11BracedList: true                    # Better overview
+SpaceBeforeCtorInitializerColon: true               # Better overview, as we mark more clearly, where initializer list starts
+SpaceBeforeInheritanceColon: true                   # Better overview, as we mark more clearly, where base class list starts
+SpaceBeforeParens: Never                            # Avoid unnecessary space
+SpaceBeforeRangeBasedForLoopColon: false            # Avoid unnecessary space
+SpaceBeforeSquareBrackets: false                    # Avoid unnecessary space
+SpaceInEmptyBlock: false                            # Avoid unnecessary space
+SpaceInEmptyParentheses: false                      # Avoid unnecessary space
+SpacesBeforeTrailingComments: 0                     # Avoid unnecessary space
+SpacesInAngles: Never                               # Avoid unnecessary space
+SpacesInCStyleCastParentheses: false                # Avoid unnecessary space
+SpacesInConditionalStatement: false                 # Avoid unnecessary space
+SpacesInParentheses: false                          # Avoid unnecessary space
+SpacesInSquareBrackets: false                       # Avoid unnecessary space
+TabWidth: 4                                         # Make tab indentation work
+UseCRLF: true                                       # Better compatibility
+UseTab: Always                                      # Use tabs where we can

@@ -1,46 +1,54 @@
-#ifndef __UTILITY_FUNCS_HPP_
-#define __UTILITY_FUNCS_HPP_
+#ifndef UTILITY_FUNCS_HPP
+#define UTILITY_FUNCS_HPP
 #include "settings.h"
 
 namespace mn {
 
+//TODO: Maybe create parameters for some of this magic numbers
+//NOLINTBEGIN(readability-magic-numbers) Magic numbers are formula-specific
 /// assume p is already within kernel range [-1.5, 1.5]
 constexpr vec3 bspline_weight(float p) {
-  vec3 dw{0.f, 0.f, 0.f};
-  float d = p * config::g_dx_inv; ///< normalized offset
-  dw[0] = 0.5f * (1.5 - d) * (1.5 - d);
-  d -= 1.0f;
-  dw[1] = 0.75 - d * d;
-  d = 0.5f + d;
-  dw[2] = 0.5 * d * d;
-  return dw;
+	vec3 dw {0.0f, 0.0f, 0.0f};
+	float d = p * config::G_DX_INV;///< normalized offset
+	dw[0]	= 0.5f * (1.5f - d) * (1.5f - d);
+	d -= 1.0f;
+	dw[1] = 0.75f - d * d;
+	d	  = 0.5f + d;
+	dw[2] = 0.5f * d * d;
+	return dw;
 }
 
-constexpr int dir_offset(ivec3 d) {
-  return (d[0] + 1) * 9 + (d[1] + 1) * 3 + d[2] + 1;
-}
-constexpr void dir_components(int dir, ivec3 &d) {
-  d[2] = (dir % 3) - 1;
-  d[1] = ((dir / 3) % 3) - 1;
-  d[0] = ((dir / 9) % 3) - 1;
+constexpr ivec3 get_block_id(const std::array<float, 3>& position) {
+	return ivec3(static_cast<int>(std::lround(position[0] * config::G_DX_INV)), static_cast<int>(std::lround(position[1] * config::G_DX_INV)), static_cast<int>(std::lround(position[2] * config::G_DX_INV)));
 }
 
-constexpr float compute_dt(float maxVel, const float cur, const float next,
-                           const float dtDefault) noexcept {
-  if (next < cur)
-    return 0.f;
-  float dt = dtDefault;
-  if (maxVel > 0. && (maxVel = config::g_dx * .3 / maxVel) < dtDefault)
-    dt = maxVel;
-
-  if (cur + dt >= next)
-    dt = next - cur;
-  else if ((maxVel = (next - cur) * 0.51) < dt)
-    dt = maxVel;
-
-  return dt;
+constexpr int dir_offset(const std::array<int, 3>& d) {
+	return (d[0] + 1) * 9 + (d[1] + 1) * 3 + d[2] + 1;
 }
+constexpr void dir_components(int dir, std::array<int, 3>& d) {
+	d[2] = (dir % 3) - 1;
+	d[1] = ((dir / 3) % 3) - 1;
+	d[0] = ((dir / 9) % 3) - 1;
+}
+//NOLINTEND(readability-magic-numbers) Magic numbers are formula-specific
 
-} // namespace mn
+//NOLINTBEGIN(readability-magic-numbers) Magic numbers are formula-specific
+constexpr Duration compute_dt(float max_vel, const Duration cur_time, const Duration next_time, const Duration dt_default) noexcept {
+	//Choose dt such that particles with maximum velocity cannot move more than G_DX * CFL
+	//This ensures CFL condition is satisfied
+	Duration dt = dt_default;
+	if(max_vel > 0.0f) {
+		const Duration new_dt(config::G_DX * config::CFL / max_vel);
+		dt = std::min(new_dt, dt);
+	}
+
+	//If next_time - cur_time is smaller as current dt, use this.
+	dt = std::min(dt, next_time - cur_time);
+
+	return dt;
+}
+//NOLINTEND(readability-magic-numbers) Magic numbers are formula-specific
+
+}// namespace mn
 
 #endif

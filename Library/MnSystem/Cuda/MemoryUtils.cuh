@@ -1,7 +1,7 @@
-#ifndef __MEMORY_UTILS_CUH_
-#define __MEMORY_UTILS_CUH_
+#ifndef MEMORY_UTILS_CUH
+#define MEMORY_UTILS_CUH
 #include "Allocators.cuh"
 
-namespace mn {} // namespace mn
+namespace mn {}// namespace mn
 
 #endif

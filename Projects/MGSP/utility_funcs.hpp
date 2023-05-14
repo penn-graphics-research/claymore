@@ -1,46 +1,60 @@
-#ifndef __UTILITY_FUNCS_HPP_
-#define __UTILITY_FUNCS_HPP_
+#ifndef UTILITY_FUNCS_HPP
+#define UTILITY_FUNCS_HPP
 #include "settings.h"
 
 namespace mn {
 
+//TODO: Maybe create parameters fopr some of this magic numbers
+//NOLINTBEGIN(readability-magic-numbers) Magic numbers are formula-specific
 /// assume p is already within kernel range [-1.5, 1.5]
 constexpr vec3 bspline_weight(float p) {
-  vec3 dw{0.f, 0.f, 0.f};
-  float d = p * config::g_dx_inv; ///< normalized offset
-  dw[0] = 0.5f * (1.5 - d) * (1.5 - d);
-  d -= 1.0f;
-  dw[1] = 0.75 - d * d;
-  d = 0.5f + d;
-  dw[2] = 0.5 * d * d;
-  return dw;
+	vec3 dw {0.0f, 0.0f, 0.0f};
+	float d = p * config::G_DX_INV;///< normalized offset
+	dw[0]	= 0.5f * (1.5f - d) * (1.5f - d);
+	d -= 1.0f;
+	dw[1] = 0.75f - d * d;
+	d	  = 0.5f + d;
+	dw[2] = 0.5f * d * d;
+	return dw;
 }
 
 constexpr int dir_offset(ivec3 d) {
-  return (d[0] + 1) * 9 + (d[1] + 1) * 3 + d[2] + 1;
+	return (d[0] + 1) * 9 + (d[1] + 1) * 3 + d[2] + 1;
 }
-constexpr void dir_components(int dir, ivec3 &d) {
-  d[2] = (dir % 3) - 1;
-  d[1] = ((dir / 3) % 3) - 1;
-  d[0] = ((dir / 9) % 3) - 1;
+constexpr void dir_components(int dir, ivec3& d) {
+	d[2] = (dir % 3) - 1;
+	d[1] = ((dir / 3) % 3) - 1;
+	d[0] = ((dir / 9) % 3) - 1;
 }
+//NOLINTEND(readability-magic-numbers) Magic numbers are formula-specific
 
-constexpr float compute_dt(float maxVel, const float cur, const float next,
-                           const float dtDefault) noexcept {
-  if (next < cur)
-    return 0.f;
-  float dt = dtDefault;
-  if (maxVel > 0. && (maxVel = config::g_dx * .3 / maxVel) < dtDefault)
-    dt = maxVel;
+//NOLINTBEGIN(readability-magic-numbers) Magic numbers are formula-specific
+constexpr float compute_dt(float max_vel, const float cur, const float next, const float dt_default) noexcept {
+	if(next < cur) {
+		return 0.0f;
+	}
 
-  if (cur + dt >= next)
-    dt = next - cur;
-  else if ((maxVel = (next - cur) * 0.51) < dt)
-    dt = maxVel;
+	float dt = dt_default;
+	if(max_vel > 0.0f) {
+		max_vel = config::G_DX * 0.3f / max_vel;
+		if(max_vel < dt_default) {
+			dt = max_vel;
+		}
+	}
 
-  return dt;
+	if(cur + dt >= next) {
+		dt = next - cur;
+	} else {
+		max_vel = (next - cur) * 0.51f;
+		if(max_vel < dt) {
+			dt = max_vel;
+		}
+	}
+
+	return dt;
 }
+//NOLINTEND(readability-magic-numbers) Magic numbers are formula-specific
 
-} // namespace mn
+}// namespace mn
 
 #endif

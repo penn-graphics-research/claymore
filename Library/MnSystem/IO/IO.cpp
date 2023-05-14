@@ -5,7 +5,7 @@
 
 namespace mn {
 
-#if 0
+/*
 void f()
 {
   double foo = -0.0;
@@ -20,6 +20,6 @@ void f()
   else if (res > 0)
     std::cout << "-0 is greater than 0";
 }
-#endif
+*/
 
 }// namespace mn

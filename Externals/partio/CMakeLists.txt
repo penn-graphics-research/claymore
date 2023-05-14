@@ -85,5 +85,6 @@ endif()
 endif()
 
 target_include_directories(partio
+	SYSTEM
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
