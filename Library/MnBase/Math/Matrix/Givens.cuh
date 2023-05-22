@@ -4,12 +4,14 @@ Givens rotation
 #ifndef GIVENS_CUH
 #define GIVENS_CUH
 #include <type_traits>
+#include <cmath>
 
 #define ENABLE_COLUMN_ROTATION 0
 #define ENABLE_ADDITIONAL_GIVENS_FUNCTION 0
 
 namespace mn {
 
+//Stable calculation from https://en.wikipedia.org/wiki/Givens_rotation
 namespace math {
 	/**
 			Class for givens rotation.
@@ -35,6 +37,7 @@ namespace math {
 		int rowk;
 		T c;
 		T s;
+		T r;
 
 		__forceinline__ __host__ __device__ GivensRotation(int rowi_in, int rowk_in)
 			: rowi(rowi_in)
@@ -65,63 +68,31 @@ namespace math {
 				s  c     b       ( 0 )
 				*/
 		template<typename TT>
-		__forceinline__ __host__ __device__ std::enable_if_t<std::is_same<TT, float>::value, void> compute(const TT a, const TT b) {
-			TT d	 = a * a + b * b;
-			c		 = 1;
-			s		 = 0;
-			TT sqrtd = sqrtf(d);
-			//T t = MATH_TOOLS::rsqrt(d);
-			if(sqrtd) {
-				TT t = 1 / sqrtd;
-				c	 = a * t;
-				s	 = -b * t;
-			}
-		}
-
-		template<typename TT>
-		__forceinline__ __host__ __device__ std::enable_if_t<std::is_same<TT, double>::value, void> compute(const TT a, const TT b) {
-			TT d	 = a * a + b * b;
-			c		 = 1;
-			s		 = 0;
-			TT sqrtd = sqrt(d);
-			//T t = MATH_TOOLS::rsqrt(d);
-			if(sqrtd) {
-				TT t = 1 / sqrtd;
-				c	 = a * t;
-				s	 = -b * t;
-			}
-		}
-
-		/**
-				This function computes c and s so that
-				( c -s ) ( a )  =  ( 0 )
-				s  c     b       ( * )
-				*/
-		template<typename TT>
-		__forceinline__ __host__ __device__ std::enable_if_t<std::is_same<TT, float>::value, void> compute_unconventional(const TT a, const TT b) {
-			TT d	 = a * a + b * b;
-			c		 = 0;
-			s		 = 1;
-			TT sqrtd = sqrtf(d);
-			//T t = MATH_TOOLS::rsqrt(d);
-			if(sqrtd) {
-				TT t = 1 / sqrtd;
-				s	 = a * t;
-				c	 = b * t;
-			}
-		}
-
-		template<typename TT>
-		__forceinline__ __host__ __device__ std::enable_if_t<std::is_same<TT, double>::value, void> compute_unconventional(const TT a, const TT b) {
-			TT d	 = a * a + b * b;
-			c		 = 0;
-			s		 = 1;
-			TT sqrtd = sqrt(d);
-			//T t = MATH_TOOLS::rsqrt(d);
-			if(sqrtd) {
-				TT t = 1 / sqrtd;
-				s	 = a * t;
-				c	 = b * t;
+		__forceinline__ __host__ __device__ std::enable_if_t<std::disjunction<std::is_same<TT, float>, std::is_same<TT, double>>::value, void> compute(const TT a, const TT b) {
+			if(b == 0.0){
+				if(a == 0.0){
+					c = static_cast<TT>(1.0);
+				}else{
+					c = std::copysign(static_cast<TT>(1.0), a);
+				}
+				s = 0.0;
+				r = std::abs(a);
+			}else if(a == 0.0){
+				c = 0.0;
+				s = std::copysign(static_cast<TT>(1.0), b);
+				r = std::abs(b);
+			}else if (std::abs(a) > std::abs(b)){
+				const TT t = b / a;
+				const TT u = std::copysign(sqrt(static_cast<TT>(1.0) + t * t), a);
+				c = static_cast<TT>(1.0) / u;
+				s = -c * t;
+				r = a * u;
+			}else{
+				const TT t = a / b;
+				const TT u = std::copysign(sqrt(static_cast<TT>(1.0) + t * t), b);
+				s = -static_cast<TT>(1.0) / u;
+				c = t / u;
+				r = b * u;
 			}
 		}
 
@@ -137,8 +108,8 @@ namespace math {
 				a[i] = 1;
 			}
 			a[rowi + rowi * Dim] = c;
-			a[rowk + rowi * Dim] = -s;
-			a[rowi + rowk * Dim] = s;
+			a[rowk + rowi * Dim] = s;
+			a[rowi + rowk * Dim] = -s;
 			a[rowk + rowk * Dim] = c;
 		}
 
